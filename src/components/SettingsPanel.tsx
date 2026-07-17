@@ -75,7 +75,7 @@ export default function SettingsPanel({ config, onSave, onClose }: SettingsPanel
                   type={show[p.id] ? 'text' : 'password'}
                   value={(draft as any)[field]}
                   onChange={(e) => set({ [field]: e.target.value } as any)}
-                  placeholder={p.id === 'claude' ? 'sk-ant-...' : p.id === 'openai' ? 'sk-...' : 'AIza...'}
+                  placeholder={p.id === 'claude' ? 'sk-ant-...' : p.id === 'openai' ? 'sk-...' : 'AQ... or AIza...'}
                 />
                 <button className="toggle-btn" onClick={() => toggle(p.id)} type="button" aria-label="Show/hide key">
                   {show[p.id] ? <EyeOff size={18} /> : <Eye size={18} />}
