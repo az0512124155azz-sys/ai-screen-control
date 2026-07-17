@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Send, Settings, MessageSquare, Loader, Monitor, Minus } from 'lucide-react';
+import { Send, Settings, MessageSquare, Loader, Monitor, MonitorOff, Minus } from 'lucide-react';
 import type { Provider } from './SettingsPanel';
 import '../styles/ChatInterface.css';
 
@@ -20,6 +20,8 @@ interface ChatInterfaceProps {
   provider: Provider;
   openSettings: () => void;
   onMinimize: () => void;
+  useScreen: boolean;
+  onToggleScreen: () => void;
 }
 
 const PROVIDER_LABEL: Record<Provider, string> = {
@@ -38,6 +40,8 @@ export default function ChatInterface({
   provider,
   openSettings,
   onMinimize,
+  useScreen,
+  onToggleScreen,
 }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -103,6 +107,14 @@ export default function ChatInterface({
       </div>
 
       <div className="chat-input-area">
+        <button
+          className={`screen-toggle ${useScreen ? 'on' : 'off'}`}
+          onClick={onToggleScreen}
+          title={useScreen ? 'Screen ON — I see your screen (uses more credits). Click to turn off.' : 'Screen OFF — text only (saves credits). Click to turn on.'}
+          aria-label="Toggle screen capture"
+        >
+          {useScreen ? <Monitor size={18} /> : <MonitorOff size={18} />}
+        </button>
         <div className="input-wrapper">
           <input
             ref={inputRef}
@@ -110,7 +122,7 @@ export default function ChatInterface({
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask anything about your screen…"
+            placeholder={useScreen ? 'Ask about your screen…' : 'Ask anything (text only)…'}
             disabled={loading}
           />
           <button className="send-btn" onClick={() => onSend()} disabled={!input.trim() || loading} aria-label="Send">

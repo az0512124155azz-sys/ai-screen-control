@@ -70,6 +70,34 @@ fn capture_screen_png() -> Result<Vec<u8>, String> {
     std::fs::read(&path).map_err(|e| format!("Could not read screenshot: {e}"))
 }
 
+// Capture the screen, downscale it (max 1280px on the long side) and re-encode
+// as JPEG. Vision models are billed by image dimensions, so shrinking the
+// screenshot dramatically cuts token cost per question.
+fn capture_screen_jpeg() -> Result<Vec<u8>, String> {
+    let png = capture_screen_png()?;
+    let img = image::load_from_memory(&png).map_err(|e| e.to_string())?;
+
+    const MAX: u32 = 1280;
+    let (w, h) = (img.width(), img.height());
+    let longest = w.max(h);
+    let scaled = if longest > MAX {
+        let ratio = MAX as f32 / longest as f32;
+        img.resize(
+            (w as f32 * ratio) as u32,
+            (h as f32 * ratio) as u32,
+            image::imageops::FilterType::Triangle,
+        )
+    } else {
+        img
+    };
+
+    let mut buf = std::io::Cursor::new(Vec::new());
+    scaled
+        .write_to(&mut buf, image::ImageFormat::Jpeg)
+        .map_err(|e| e.to_string())?;
+    Ok(buf.into_inner())
+}
+
 #[derive(Serialize)]
 pub struct ScreenshotResult {
     pub success: bool,
@@ -110,7 +138,7 @@ pub struct AIResponse {
 #[tauri::command]
 pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
     let image_b64 = if request.capture_screen {
-        match capture_screen_png() {
+        match capture_screen_jpeg() {
             Ok(bytes) => Some(STANDARD.encode(bytes)),
             Err(e) => {
                 // Don't fail the whole request if capture fails; answer text-only.
@@ -139,7 +167,7 @@ async fn ask_claude(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
     if let Some(b64) = image_b64 {
         content.push(serde_json::json!({
             "type": "image",
-            "source": { "type": "base64", "media_type": "image/png", "data": b64 }
+            "source": { "type": "base64", "media_type": "image/jpeg", "data": b64 }
         }));
     }
     let body = serde_json::json!({
@@ -169,7 +197,7 @@ async fn ask_openai(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
     if let Some(b64) = image_b64 {
         content.push(serde_json::json!({
             "type": "image_url",
-            "image_url": { "url": format!("data:image/png;base64,{b64}") }
+            "image_url": { "url": format!("data:image/jpeg;base64,{b64}") }
         }));
     }
     let body = serde_json::json!({
@@ -200,7 +228,7 @@ async fn ask_gemini(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
     let mut parts = vec![serde_json::json!({ "text": req.question })];
     if let Some(b64) = image_b64 {
         parts.push(serde_json::json!({
-            "inline_data": { "mime_type": "image/png", "data": b64 }
+            "inline_data": { "mime_type": "image/jpeg", "data": b64 }
         }));
     }
     let body = serde_json::json!({ "contents": [{ "parts": parts }] });

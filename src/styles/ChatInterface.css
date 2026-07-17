@@ -325,3 +325,17 @@
   transition: background 0.2s ease;
 }
 .minimize-btn:hover { background: rgba(255, 255, 255, 0.34); }
+
+/* screen-capture on/off toggle */
+.screen-toggle {
+  flex-shrink: 0;
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 0.2s ease;
+}
+.screen-toggle.on  { background: rgba(102,126,234,0.15); color: #667eea; }
+.screen-toggle.off { background: #eef0f4; color: #94a3b8; }
+.screen-toggle:hover { filter: brightness(0.96); }

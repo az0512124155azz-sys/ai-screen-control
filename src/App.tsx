@@ -56,7 +56,12 @@ export default function App() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState<ProviderConfig>(loadConfig());
+  const [useScreen, setUseScreen] = useState<boolean>(
+    localStorage.getItem('use_screen') !== 'false'
+  );
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { localStorage.setItem('use_screen', String(useScreen)); }, [useScreen]);
 
   // Start collapsed as a small bubble in the bottom-right of the desktop.
   useEffect(() => { setWindow(false); }, []);
@@ -99,7 +104,7 @@ export default function App() {
     setLoading(true);
     try {
       const result: any = await invoke('ask', {
-        request: { question, provider: config.provider, apiKey, model: modelFor(config.provider), captureScreen: true },
+        request: { question, provider: config.provider, apiKey, model: modelFor(config.provider), captureScreen: useScreen },
       });
       addMessage('assistant', result?.response ?? 'No response');
     } catch (err) {
@@ -147,6 +152,8 @@ export default function App() {
         provider={config.provider}
         openSettings={() => setView('settings')}
         onMinimize={minimize}
+        useScreen={useScreen}
+        onToggleScreen={() => setUseScreen((v) => !v)}
       />
     </div>
   );
