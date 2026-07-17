@@ -164,7 +164,7 @@ Contributions welcome! Please:
 
 ## License
 
-MIT License - See LICENSE file
+Proprietary — All rights reserved. See LICENSE file.
 
 ## Support
 
