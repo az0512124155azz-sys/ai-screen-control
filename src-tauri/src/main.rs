@@ -3,7 +3,7 @@
 
 mod commands;
 use commands::{
-    ask, control_keyboard, control_mouse, get_window_info, run_command, screenshot,
+    ask, control_keyboard, control_mouse, get_window_info, open_url, run_command, screenshot,
 };
 
 fn main() {
@@ -11,6 +11,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             ask,
             screenshot,
+            open_url,
             run_command,
             control_mouse,
             control_keyboard,

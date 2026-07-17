@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import '../styles/SettingsPanel.css';
+
+// Open an external link in the real browser (Tauri webviews don't do this by default).
+function openExternal(url: string) {
+  invoke('open_url', { url }).catch(() => window.open(url, '_blank'));
+}
 
 export type Provider = 'claude' | 'openai' | 'gemini';
 
@@ -82,7 +88,9 @@ export default function SettingsPanel({ config, onSave, onClose }: SettingsPanel
                 </button>
               </div>
               <p className="help-text">
-                <a href={p.keyPage} target="_blank" rel="noopener noreferrer">Get a {p.label} key →</a>
+                <a href={p.keyPage} onClick={(e) => { e.preventDefault(); openExternal(p.keyPage); }}>
+                  Get a {p.label} key →
+                </a>
               </p>
             </div>
           );

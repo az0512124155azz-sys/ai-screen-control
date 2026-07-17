@@ -222,12 +222,33 @@ async fn ask_gemini(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
 
     let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
     if let Some(err) = json.get("error") {
-        return Err(err["message"].as_str().unwrap_or("Gemini API error").to_string());
+        let msg = err["message"].as_str().unwrap_or("Gemini API error");
+        let lower = msg.to_lowercase();
+        if lower.contains("quota") || lower.contains("exhausted") || lower.contains("limit: 0") {
+            return Err("Your Google account has no Gemini quota (free-tier limit is 0). \
+                        Switch to Claude or OpenAI in Settings, or enable billing on your \
+                        Google Cloud project."
+                .to_string());
+        }
+        return Err(msg.to_string());
     }
     Ok(json["candidates"][0]["content"]["parts"][0]["text"]
         .as_str()
         .unwrap_or("No response")
         .to_string())
+}
+
+// Open a URL in the user's default web browser.
+#[tauri::command]
+pub async fn open_url(url: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let res = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+    #[cfg(target_os = "macos")]
+    let res = Command::new("open").arg(&url).spawn();
+    #[cfg(target_os = "linux")]
+    let res = Command::new("xdg-open").arg(&url).spawn();
+
+    res.map(|_| ()).map_err(|e| e.to_string())
 }
 
 // ---------- Computer control ----------
