@@ -120,7 +120,6 @@ export default function App() {
           title="Tap to open · hold to move"
         >
           <span className="bubble-emoji">🤖</span>
-          {messages.length > 0 && <span className="bubble-badge">{messages.length}</span>}
         </button>
       </div>
     );
