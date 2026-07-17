@@ -754,17 +754,9 @@
         '<div class="modal-note" role="note">' +
           '🎥 <strong>YouTube video analysis requires a Gemini API key</strong> — only Gemini can read full video content. ' +
           'You can also connect several AI providers and use them in parallel.' +
-        '</div>' +
-        '<button class="redownload-btn" onclick="saveGuide(\'' + method + '\')">' +
-        '💾 Save these steps as a text file (optional)</button>';
+        '</div>';
       // Reset scroll to top of the dialog body
       document.getElementById('modalBody').scrollTop = 0;
-    }
-
-    // Optional: let the user save the same steps as a .txt file
-    function saveGuide(method) {
-      var file = buildDownloadFile(currentOS, method);
-      triggerDownload(file.filename, file.content);
     }
 
     // Build the file that gets downloaded.
