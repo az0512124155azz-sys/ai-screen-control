@@ -1,0 +1,30 @@
+# Vite
+dist/
+.vite/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Rust/Cargo
+target/
+Cargo.lock
+# Icons are generated in CI from icon.png; keep only the source
+src-tauri/icons/*
+!src-tauri/icons/icon.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+.eslintcache
