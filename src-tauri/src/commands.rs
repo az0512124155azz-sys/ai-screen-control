@@ -1,234 +1,322 @@
-// Tauri Commands - Handle Screen Control and AI Integration
+// Tauri commands: multi-provider AI, automatic screen capture, and computer control.
 
-use serde::{Serialize, Deserialize};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 
-#[derive(Serialize, Deserialize, Debug)]
+// ---------- Screen capture ----------
+
+// Capture the whole screen to a PNG and return the raw bytes.
+fn capture_screen_png() -> Result<Vec<u8>, String> {
+    let path = std::env::temp_dir().join("ai_screen_capture.png");
+    let path_str = path.to_string_lossy().to_string();
+
+    #[cfg(target_os = "linux")]
+    {
+        // Try gnome-screenshot, then ImageMagick's `import`, then `scrot`.
+        let ok = Command::new("gnome-screenshot")
+            .args(["-f", &path_str])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+            || Command::new("scrot")
+                .arg(&path_str)
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false)
+            || Command::new("import")
+                .args(["-window", "root", &path_str])
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+        if !ok {
+            return Err("Screen capture failed. Install gnome-screenshot or scrot.".into());
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let ok = Command::new("screencapture")
+            .args(["-x", &path_str])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if !ok {
+            return Err("Screen capture failed (screencapture).".into());
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let ps = format!(
+            "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \
+             $b = [System.Windows.Forms.SystemInformation]::VirtualScreen; \
+             $bmp = New-Object System.Drawing.Bitmap($b.Width, $b.Height); \
+             $g = [System.Drawing.Graphics]::FromImage($bmp); \
+             $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); \
+             $bmp.Save('{}'); $g.Dispose(); $bmp.Dispose()",
+            path_str.replace('\\', "\\\\")
+        );
+        let ok = Command::new("powershell")
+            .args(["-NoProfile", "-Command", &ps])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if !ok {
+            return Err("Screen capture failed (PowerShell).".into());
+        }
+    }
+
+    std::fs::read(&path).map_err(|e| format!("Could not read screenshot: {e}"))
+}
+
+#[derive(Serialize)]
 pub struct ScreenshotResult {
-  pub success: bool,
-  pub message: String,
-  pub data: Option<String>,
+    pub success: bool,
+    pub message: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AIRequest {
-  pub question: String,
-  pub screenshot: Option<String>,
-  pub api_key: String,
-  pub model: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AIResponse {
-  pub success: bool,
-  pub response: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct MouseControl {
-  pub x: i32,
-  pub y: i32,
-  pub button: String,
-  pub action: String, // "move", "click", "drag"
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct KeyboardControl {
-  pub keys: Vec<String>,
-  pub action: String, // "press", "release", "type"
-  pub text: Option<String>,
-}
-
-// Take a screenshot using platform-specific tools
+// Manual capture (kept for convenience / testing).
 #[tauri::command]
 pub async fn screenshot() -> Result<ScreenshotResult, String> {
-  #[cfg(target_os = "linux")]
-  {
-    let output = Command::new("gnome-screenshot")
-      .arg("-f")
-      .arg("/tmp/screenshot.png")
-      .output()
-      .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-      return Ok(ScreenshotResult {
+    capture_screen_png()?;
+    Ok(ScreenshotResult {
         success: true,
-        message: "Screenshot saved".to_string(),
-        data: Some("/tmp/screenshot.png".to_string()),
-      });
-    }
-  }
-
-  #[cfg(target_os = "windows")]
-  {
-    let output = Command::new("powershell")
-      .arg("-Command")
-      .arg("[System.Windows.Forms.Screen]::PrimaryScreen | ForEach-Object { $bitmap = New-Object System.Drawing.Bitmap($_.Bounds.Width, $_.Bounds.Height); $graphics = [System.Drawing.Graphics]::FromImage($bitmap); $graphics.CopyFromScreen($_.Bounds.Location, [System.Drawing.Point]::Empty, $_.Bounds.Size); $bitmap.Save('C:\\\\temp\\\\screenshot.png'); $graphics.Dispose(); $bitmap.Dispose() }")
-      .output()
-      .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-      return Ok(ScreenshotResult {
-        success: true,
-        message: "Screenshot saved".to_string(),
-        data: Some("C:\\temp\\screenshot.png".to_string()),
-      });
-    }
-  }
-
-  #[cfg(target_os = "macos")]
-  {
-    let output = Command::new("screencapture")
-      .arg("-x")
-      .arg("/tmp/screenshot.png")
-      .output()
-      .map_err(|e| e.to_string())?;
-
-    if output.status.success() {
-      return Ok(ScreenshotResult {
-        success: true,
-        message: "Screenshot saved".to_string(),
-        data: Some("/tmp/screenshot.png".to_string()),
-      });
-    }
-  }
-
-  Err("Failed to take screenshot".to_string())
+        message: "Screenshot captured".into(),
+    })
 }
 
-// Send request to Claude API
-#[tauri::command]
-pub async fn send_to_ai(request: AIRequest) -> Result<AIResponse, String> {
-  let client = reqwest::Client::new();
+// ---------- AI (multi-provider) ----------
 
-  let body = serde_json::json!({
-    "model": request.model,
-    "messages": [
-      {
-        "role": "user",
-        "content": [
-          {
-            "type": "text",
-            "text": request.question
-          },
-          {
-            "type": "image",
-            "source": {
-              "type": "base64",
-              "media_type": "image/png",
-              "data": request.screenshot
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AskRequest {
+    pub question: String,
+    pub provider: String, // "claude" | "openai" | "gemini"
+    pub api_key: String,
+    pub model: String,
+    #[serde(default)]
+    pub capture_screen: bool,
+}
+
+#[derive(Serialize)]
+pub struct AIResponse {
+    pub success: bool,
+    pub response: String,
+}
+
+// Ask the selected AI provider a question. If capture_screen is true, the app
+// grabs the screen itself and sends it along — the user never uploads anything.
+#[tauri::command]
+pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
+    let image_b64 = if request.capture_screen {
+        match capture_screen_png() {
+            Ok(bytes) => Some(STANDARD.encode(bytes)),
+            Err(e) => {
+                // Don't fail the whole request if capture fails; answer text-only.
+                eprintln!("screen capture warning: {e}");
+                None
             }
-          }
-        ]
-      }
-    ]
-  });
-
-  let response = client
-    .post("https://api.anthropic.com/v1/messages")
-    .header("x-api-key", &request.api_key)
-    .header("anthropic-version", "2023-06-01")
-    .json(&body)
-    .send()
-    .await
-    .map_err(|e| e.to_string())?;
-
-  let result = response.json::<serde_json::Value>().await.map_err(|e| e.to_string())?;
-
-  let response_text = result["content"][0]["text"]
-    .as_str()
-    .unwrap_or("No response")
-    .to_string();
-
-  Ok(AIResponse {
-    success: true,
-    response: response_text,
-  })
-}
-
-// Control mouse
-#[tauri::command]
-pub async fn control_mouse(control: MouseControl) -> Result<String, String> {
-  #[cfg(target_os = "linux")]
-  {
-    match control.action.as_str() {
-      "move" => {
-        Command::new("xdotool")
-          .args(&["mousemove", &control.x.to_string(), &control.y.to_string()])
-          .output()
-          .map_err(|e| e.to_string())?;
-      }
-      "click" => {
-        let button = match control.button.as_str() {
-          "left" => "1",
-          "right" => "3",
-          "middle" => "2",
-          _ => "1",
-        };
-        Command::new("xdotool")
-          .args(&["click", button])
-          .output()
-          .map_err(|e| e.to_string())?;
-      }
-      _ => {}
-    }
-  }
-
-  #[cfg(target_os = "windows")]
-  {
-    let ps_cmd = match control.action.as_str() {
-      "move" => format!(
-        "[System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point({}, {})",
-        control.x, control.y
-      ),
-      "click" => "[System.Windows.Forms.SendKeys]::SendWait('+{{F10}}')".to_string(),
-      _ => String::new(),
+        }
+    } else {
+        None
     };
 
-    Command::new("powershell")
-      .arg("-Command")
-      .arg(ps_cmd)
-      .output()
-      .map_err(|e| e.to_string())?;
-  }
+    let text = match request.provider.as_str() {
+        "openai" => ask_openai(&request, image_b64.as_deref()).await?,
+        "gemini" => ask_gemini(&request, image_b64.as_deref()).await?,
+        _ => ask_claude(&request, image_b64.as_deref()).await?,
+    };
 
-  Ok("Mouse controlled".to_string())
+    Ok(AIResponse {
+        success: true,
+        response: text,
+    })
 }
 
-// Control keyboard
+async fn ask_claude(req: &AskRequest, image_b64: Option<&str>) -> Result<String, String> {
+    let mut content = vec![serde_json::json!({ "type": "text", "text": req.question })];
+    if let Some(b64) = image_b64 {
+        content.push(serde_json::json!({
+            "type": "image",
+            "source": { "type": "base64", "media_type": "image/png", "data": b64 }
+        }));
+    }
+    let body = serde_json::json!({
+        "model": req.model,
+        "max_tokens": 1024,
+        "messages": [{ "role": "user", "content": content }]
+    });
+
+    let resp = reqwest::Client::new()
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", &req.api_key)
+        .header("anthropic-version", "2023-06-01")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    if let Some(err) = json.get("error") {
+        return Err(err["message"].as_str().unwrap_or("Claude API error").to_string());
+    }
+    Ok(json["content"][0]["text"].as_str().unwrap_or("No response").to_string())
+}
+
+async fn ask_openai(req: &AskRequest, image_b64: Option<&str>) -> Result<String, String> {
+    let mut content = vec![serde_json::json!({ "type": "text", "text": req.question })];
+    if let Some(b64) = image_b64 {
+        content.push(serde_json::json!({
+            "type": "image_url",
+            "image_url": { "url": format!("data:image/png;base64,{b64}") }
+        }));
+    }
+    let body = serde_json::json!({
+        "model": req.model,
+        "max_tokens": 1024,
+        "messages": [{ "role": "user", "content": content }]
+    });
+
+    let resp = reqwest::Client::new()
+        .post("https://api.openai.com/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", req.api_key))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    if let Some(err) = json.get("error") {
+        return Err(err["message"].as_str().unwrap_or("OpenAI API error").to_string());
+    }
+    Ok(json["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("No response")
+        .to_string())
+}
+
+async fn ask_gemini(req: &AskRequest, image_b64: Option<&str>) -> Result<String, String> {
+    let mut parts = vec![serde_json::json!({ "text": req.question })];
+    if let Some(b64) = image_b64 {
+        parts.push(serde_json::json!({
+            "inline_data": { "mime_type": "image/png", "data": b64 }
+        }));
+    }
+    let body = serde_json::json!({ "contents": [{ "parts": parts }] });
+
+    let url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+        req.model, req.api_key
+    );
+    let resp = reqwest::Client::new()
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    if let Some(err) = json.get("error") {
+        return Err(err["message"].as_str().unwrap_or("Gemini API error").to_string());
+    }
+    Ok(json["candidates"][0]["content"]["parts"][0]["text"]
+        .as_str()
+        .unwrap_or("No response")
+        .to_string())
+}
+
+// ---------- Computer control ----------
+
+// Run a terminal/shell command so the app can control the computer.
+#[tauri::command]
+pub async fn run_command(command: String) -> Result<String, String> {
+    let output = if cfg!(target_os = "windows") {
+        Command::new("cmd").args(["/C", &command]).output()
+    } else {
+        Command::new("sh").args(["-c", &command]).output()
+    }
+    .map_err(|e| e.to_string())?;
+
+    let mut out = String::from_utf8_lossy(&output.stdout).to_string();
+    let err = String::from_utf8_lossy(&output.stderr);
+    if !err.is_empty() {
+        out.push_str("\n");
+        out.push_str(&err);
+    }
+    Ok(out)
+}
+
+#[derive(Deserialize)]
+pub struct MouseControl {
+    pub x: i32,
+    pub y: i32,
+    pub button: String,
+    pub action: String, // "move" | "click"
+}
+
+#[tauri::command]
+pub async fn control_mouse(control: MouseControl) -> Result<String, String> {
+    #[cfg(target_os = "linux")]
+    {
+        match control.action.as_str() {
+            "move" => {
+                Command::new("xdotool")
+                    .args(["mousemove", &control.x.to_string(), &control.y.to_string()])
+                    .output()
+                    .map_err(|e| e.to_string())?;
+            }
+            "click" => {
+                let button = match control.button.as_str() {
+                    "right" => "3",
+                    "middle" => "2",
+                    _ => "1",
+                };
+                Command::new("xdotool")
+                    .args(["mousemove", &control.x.to_string(), &control.y.to_string(), "click", button])
+                    .output()
+                    .map_err(|e| e.to_string())?;
+            }
+            _ => {}
+        }
+    }
+    let _ = &control; // used on all platforms
+    Ok("ok".into())
+}
+
+#[derive(Deserialize)]
+pub struct KeyboardControl {
+    pub action: String, // "type" | "press"
+    pub text: Option<String>,
+    pub keys: Vec<String>,
+}
+
 #[tauri::command]
 pub async fn control_keyboard(control: KeyboardControl) -> Result<String, String> {
-  #[cfg(target_os = "linux")]
-  {
-    match control.action.as_str() {
-      "type" => {
-        if let Some(text) = control.text {
-          Command::new("xdotool")
-            .args(&["type", &text])
-            .output()
-            .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "linux")]
+    {
+        match control.action.as_str() {
+            "type" => {
+                if let Some(text) = &control.text {
+                    Command::new("xdotool").args(["type", text]).output().map_err(|e| e.to_string())?;
+                }
+            }
+            "press" => {
+                for key in &control.keys {
+                    Command::new("xdotool").args(["key", key]).output().map_err(|e| e.to_string())?;
+                }
+            }
+            _ => {}
         }
-      }
-      "press" => {
-        for key in control.keys {
-          Command::new("xdotool")
-            .args(&["key", &key])
-            .output()
-            .map_err(|e| e.to_string())?;
-        }
-      }
-      _ => {}
     }
-  }
-
-  Ok("Keyboard controlled".to_string())
+    let _ = &control;
+    Ok("ok".into())
 }
 
-// Get window information
 #[tauri::command]
 pub async fn get_window_info() -> Result<serde_json::Value, String> {
-  Ok(serde_json::json!({
-    "platform": std::env::consts::OS,
-    "arch": std::env::consts::ARCH,
-  }))
+    Ok(serde_json::json!({
+        "platform": std::env::consts::OS,
+        "arch": std::env::consts::ARCH,
+    }))
 }

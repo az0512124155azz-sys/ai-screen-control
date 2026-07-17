@@ -2,29 +2,43 @@ import React, { useState } from 'react';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import '../styles/SettingsPanel.css';
 
+export type Provider = 'claude' | 'openai' | 'gemini';
+
+export interface ProviderConfig {
+  provider: Provider;
+  claudeKey: string;
+  openaiKey: string;
+  geminiKey: string;
+}
+
 interface SettingsPanelProps {
-  apiKey: string;
-  onApiKeyChange: (key: string) => void;
+  config: ProviderConfig;
+  onSave: (config: ProviderConfig) => void;
   onClose: () => void;
 }
 
-export default function SettingsPanel({
-  apiKey,
-  onApiKeyChange,
-  onClose,
-}: SettingsPanelProps) {
-  const [showKey, setShowKey] = useState(false);
-  const [tempKey, setTempKey] = useState(apiKey);
+const PROVIDERS: { id: Provider; label: string; icon: string; keyPage: string; model: string }[] = [
+  { id: 'claude', label: 'Claude', icon: '🤖', keyPage: 'https://console.anthropic.com/settings/keys', model: 'claude-3-5-sonnet-20241022' },
+  { id: 'openai', label: 'OpenAI (GPT-4o)', icon: '⚡', keyPage: 'https://platform.openai.com/api-keys', model: 'gpt-4o' },
+  { id: 'gemini', label: 'Gemini', icon: '🎨', keyPage: 'https://aistudio.google.com/app/apikey', model: 'gemini-2.0-flash' },
+];
 
-  const handleSave = () => {
-    onApiKeyChange(tempKey);
-    onClose();
+export default function SettingsPanel({ config, onSave, onClose }: SettingsPanelProps) {
+  const [draft, setDraft] = useState<ProviderConfig>(config);
+  const [show, setShow] = useState<Record<string, boolean>>({});
+
+  const set = (patch: Partial<ProviderConfig>) => setDraft((d) => ({ ...d, ...patch }));
+  const toggle = (id: string) => setShow((s) => ({ ...s, [id]: !s[id] }));
+
+  const keyField = (id: Provider) => {
+    const map = { claude: 'claudeKey', openai: 'openaiKey', gemini: 'geminiKey' } as const;
+    return map[id];
   };
 
   return (
     <div className="settings-panel">
       <div className="settings-header">
-        <button className="back-btn" onClick={onClose}>
+        <button className="back-btn" onClick={onClose} aria-label="Back">
           <ArrowLeft size={20} />
         </button>
         <h1>Settings</h1>
@@ -32,71 +46,62 @@ export default function SettingsPanel({
 
       <div className="settings-content">
         <div className="setting-group">
-          <label htmlFor="api-key">Claude API Key</label>
-          <div className="api-key-input">
-            <input
-              id="api-key"
-              type={showKey ? 'text' : 'password'}
-              value={tempKey}
-              onChange={(e) => setTempKey(e.target.value)}
-              placeholder="sk-ant-..."
-            />
-            <button
-              className="toggle-btn"
-              onClick={() => setShowKey(!showKey)}
-              type="button"
-            >
-              {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
+          <h3>Active AI</h3>
+          <p className="help-text">Choose which AI answers your questions. You can switch anytime.</p>
+          <div className="provider-picker">
+            {PROVIDERS.map((p) => (
+              <button
+                key={p.id}
+                className={`provider-chip ${draft.provider === p.id ? 'active' : ''}`}
+                onClick={() => set({ provider: p.id })}
+              >
+                <span className="chip-icon">{p.icon}</span>
+                {p.label}
+              </button>
+            ))}
           </div>
-          <p className="help-text">
-            Get your API key from{' '}
-            <a href="https://console.anthropic.com/account/keys" target="_blank" rel="noopener noreferrer">
-              console.anthropic.com
-            </a>
-          </p>
         </div>
 
-        <div className="setting-group">
-          <h3>Available Models</h3>
-          <ul className="models-list">
-            <li>claude-3-5-sonnet-20241022 (Latest)</li>
-            <li>claude-3-opus-20250219</li>
-            <li>claude-3-haiku-20240307</li>
-          </ul>
-        </div>
+        {PROVIDERS.map((p) => {
+          const field = keyField(p.id);
+          return (
+            <div className="setting-group" key={p.id}>
+              <label htmlFor={`key-${p.id}`}>
+                {p.icon} {p.label} API key
+              </label>
+              <div className="api-key-input">
+                <input
+                  id={`key-${p.id}`}
+                  type={show[p.id] ? 'text' : 'password'}
+                  value={(draft as any)[field]}
+                  onChange={(e) => set({ [field]: e.target.value } as any)}
+                  placeholder={p.id === 'claude' ? 'sk-ant-...' : p.id === 'openai' ? 'sk-...' : 'AIza...'}
+                />
+                <button className="toggle-btn" onClick={() => toggle(p.id)} type="button" aria-label="Show/hide key">
+                  {show[p.id] ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              <p className="help-text">
+                <a href={p.keyPage} target="_blank" rel="noopener noreferrer">Get a {p.label} key →</a>
+              </p>
+            </div>
+          );
+        })}
 
         <div className="setting-group">
-          <h3>Features</h3>
-          <label className="checkbox-label">
-            <input type="checkbox" defaultChecked disabled />
-            <span>Screen Capture</span>
-          </label>
-          <label className="checkbox-label">
-            <input type="checkbox" defaultChecked disabled />
-            <span>Screen Control (Coming Soon)</span>
-          </label>
-          <label className="checkbox-label">
-            <input type="checkbox" defaultChecked disabled />
-            <span>Video Analysis (Coming Soon)</span>
-          </label>
-        </div>
-
-        <div className="setting-group">
-          <h3>Info</h3>
-          <p className="info-text">Version: 1.0.0</p>
-          <p className="info-text">Platform: {navigator.platform}</p>
+          <h3>How it works</h3>
+          <p className="info-text">📸 The app captures your screen automatically with every question — you never upload anything.</p>
+          <p className="info-text">🎥 For YouTube video analysis, use a <strong>Gemini</strong> key.</p>
+          <p className="info-text">🔀 Add several keys and switch between AIs anytime.</p>
         </div>
       </div>
 
       <div className="settings-footer">
-        <button className="cancel-btn" onClick={onClose}>
-          Cancel
-        </button>
-        <button className="save-btn" onClick={handleSave}>
-          Save Changes
-        </button>
+        <button className="cancel-btn" onClick={onClose}>Cancel</button>
+        <button className="save-btn" onClick={() => onSave(draft)}>Save</button>
       </div>
     </div>
   );
 }
+
+export { PROVIDERS };

@@ -1,9 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Mic, Send, Settings, Loader } from 'lucide-react';
-import FloatingBubble from './components/FloatingBubble';
 import ChatInterface from './components/ChatInterface';
-import SettingsPanel from './components/SettingsPanel';
+import SettingsPanel, { ProviderConfig, Provider, PROVIDERS } from './components/SettingsPanel';
 import './App.css';
 
 interface Message {
@@ -13,92 +11,82 @@ interface Message {
   timestamp: Date;
 }
 
+const DEFAULT_CONFIG: ProviderConfig = {
+  provider: 'claude',
+  claudeKey: '',
+  openaiKey: '',
+  geminiKey: '',
+};
+
+function loadConfig(): ProviderConfig {
+  try {
+    return { ...DEFAULT_CONFIG, ...JSON.parse(localStorage.getItem('ai_config') || '{}') };
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
+function keyFor(cfg: ProviderConfig): string {
+  return cfg.provider === 'openai' ? cfg.openaiKey : cfg.provider === 'gemini' ? cfg.geminiKey : cfg.claudeKey;
+}
+
+function modelFor(provider: Provider): string {
+  return PROVIDERS.find((p) => p.id === provider)!.model;
+}
+
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('claude_api_key') || '');
-  const [screenshot, setScreenshot] = useState<string | null>(null);
-  const [isBubbleVisible, setIsBubbleVisible] = useState(true);
+  const [config, setConfig] = useState<ProviderConfig>(loadConfig());
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    localStorage.setItem('claude_api_key', apiKey);
-  }, [apiKey]);
+    localStorage.setItem('ai_config', JSON.stringify(config));
+  }, [config]);
 
-  const takeScreenshot = async () => {
-    try {
-      const result: any = await invoke('screenshot');
-      if (result.success && result.data) {
-        setScreenshot(result.data);
-        addMessage({
-          role: 'assistant',
-          content: '📸 Screenshot captured. Ready to analyze.',
-        });
-      }
-    } catch (error) {
-      console.error('Screenshot failed:', error);
-      addMessage({
-        role: 'assistant',
-        content: '❌ Failed to capture screenshot.',
-      });
-    }
-  };
+  const addMessage = (role: Message['role'], content: string) =>
+    setMessages((prev) => [...prev, { role, content, id: `${Date.now()}-${Math.random()}`, timestamp: new Date() }]);
 
   const sendMessage = async (text?: string) => {
-    const messageText = text || input;
-    if (!messageText.trim() || !apiKey) return;
+    const question = (text ?? input).trim();
+    if (!question || loading) return;
 
-    addMessage({
-      role: 'user',
-      content: messageText,
-    });
+    const apiKey = keyFor(config);
+    if (!apiKey) {
+      setShowSettings(true);
+      return;
+    }
 
+    addMessage('user', question);
     setInput('');
     setLoading(true);
 
     try {
-      const result: any = await invoke('send_to_ai', {
-        question: messageText,
-        screenshot: screenshot,
-        apiKey: apiKey,
-        model: 'claude-3-5-sonnet-20241022',
+      // The app captures the screen automatically — the user never uploads anything.
+      const result: any = await invoke('ask', {
+        request: {
+          question,
+          provider: config.provider,
+          apiKey,
+          model: modelFor(config.provider),
+          captureScreen: true,
+        },
       });
-
-      if (result.success) {
-        addMessage({
-          role: 'assistant',
-          content: result.response,
-        });
-      }
-    } catch (error) {
-      console.error('AI request failed:', error);
-      addMessage({
-        role: 'assistant',
-        content: `❌ Error: ${String(error)}`,
-      });
+      addMessage('assistant', result?.response ?? 'No response');
+    } catch (err) {
+      addMessage('assistant', `❌ Error: ${String(err)}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const addMessage = (msg: Omit<Message, 'id' | 'timestamp'>) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        ...msg,
-        id: Date.now().toString(),
-        timestamp: new Date(),
-      },
-    ]);
-  };
-
   if (showSettings) {
     return (
       <SettingsPanel
-        apiKey={apiKey}
-        onApiKeyChange={setApiKey}
+        config={config}
+        onSave={(c) => { setConfig(c); setShowSettings(false); }}
         onClose={() => setShowSettings(false)}
       />
     );
@@ -106,26 +94,15 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {isBubbleVisible && (
-        <FloatingBubble
-          onScreenshot={takeScreenshot}
-          onSettings={() => setShowSettings(true)}
-          onToggle={() => setIsBubbleVisible(false)}
-          messageCount={messages.length}
-        />
-      )}
-
       <ChatInterface
         messages={messages}
         input={input}
         onInputChange={setInput}
         onSend={sendMessage}
-        onScreenshot={takeScreenshot}
         loading={loading}
         inputRef={inputRef}
-        screenshot={screenshot}
-        showSettings={() => setShowSettings(true)}
-        toggleBubble={() => setIsBubbleVisible(!isBubbleVisible)}
+        provider={config.provider}
+        openSettings={() => setShowSettings(true)}
       />
     </div>
   );

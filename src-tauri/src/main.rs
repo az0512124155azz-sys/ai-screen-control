@@ -2,17 +2,20 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
-use commands::{screenshot, send_to_ai, control_mouse, control_keyboard, get_window_info};
+use commands::{
+    ask, control_keyboard, control_mouse, get_window_info, run_command, screenshot,
+};
 
 fn main() {
-  tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![
-      screenshot,
-      send_to_ai,
-      control_mouse,
-      control_keyboard,
-      get_window_info
-    ])
-    .run(tauri::generate_context!())
-    .expect("error while running AI Screen Control");
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            ask,
+            screenshot,
+            run_command,
+            control_mouse,
+            control_keyboard,
+            get_window_info
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running AI Screen Control");
 }

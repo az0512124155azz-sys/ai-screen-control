@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { Send, Camera, Settings, MessageSquare, Loader } from 'lucide-react';
+import { Send, Settings, MessageSquare, Loader, Monitor } from 'lucide-react';
+import type { Provider } from './SettingsPanel';
 import '../styles/ChatInterface.css';
 
 interface Message {
@@ -14,31 +15,33 @@ interface ChatInterfaceProps {
   input: string;
   onInputChange: (value: string) => void;
   onSend: (text?: string) => void;
-  onScreenshot: () => void;
   loading: boolean;
   inputRef: React.RefObject<HTMLInputElement>;
-  screenshot: string | null;
-  showSettings: () => void;
-  toggleBubble: () => void;
+  provider: Provider;
+  openSettings: () => void;
 }
+
+const PROVIDER_LABEL: Record<Provider, string> = {
+  claude: '🤖 Claude',
+  openai: '⚡ GPT-4o',
+  gemini: '🎨 Gemini',
+};
 
 export default function ChatInterface({
   messages,
   input,
   onInputChange,
   onSend,
-  onScreenshot,
   loading,
   inputRef,
-  screenshot,
-  showSettings,
-  toggleBubble,
+  provider,
+  openSettings,
 }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, loading]);
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -49,40 +52,32 @@ export default function ChatInterface({
 
   return (
     <div className="chat-interface">
-      <div className="chat-header">
-        <div className="header-title">
+      <div className="chat-header" data-tauri-drag-region>
+        <div className="header-title" data-tauri-drag-region>
           <MessageSquare size={20} />
           <span>AI Screen Control</span>
         </div>
-        <div className="header-actions">
-          <button className="icon-btn" onClick={showSettings} title="Settings">
-            <Settings size={18} />
-          </button>
-          <button className="icon-btn" onClick={toggleBubble} title="Toggle Bubble">
-            <span className="icon-text">⊕</span>
-          </button>
-        </div>
+        <button className="provider-badge" onClick={openSettings} title="Change AI / settings">
+          {PROVIDER_LABEL[provider]}
+          <Settings size={15} />
+        </button>
       </div>
 
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="empty-state">
-            <MessageSquare size={48} />
-            <h2>Welcome to AI Screen Control</h2>
-            <p>Take a screenshot and ask questions about what you see,</p>
-            <p>or control your screen with AI assistance.</p>
+            <Monitor size={48} />
+            <h2>Ask about your screen</h2>
+            <p>Type a question and I'll look at your screen automatically to answer.</p>
+            <p className="hint">No screenshots to upload — I capture it myself.</p>
           </div>
         ) : (
           messages.map((msg) => (
             <div key={msg.id} className={`message message-${msg.role}`}>
-              <div className="message-avatar">
-                {msg.role === 'user' ? '👤' : '🤖'}
-              </div>
+              <div className="message-avatar">{msg.role === 'user' ? '👤' : '🤖'}</div>
               <div className="message-content">
                 <div className="message-text">{msg.content}</div>
-                <div className="message-time">
-                  {msg.timestamp.toLocaleTimeString()}
-                </div>
+                <div className="message-time">{msg.timestamp.toLocaleTimeString()}</div>
               </div>
             </div>
           ))
@@ -91,33 +86,16 @@ export default function ChatInterface({
           <div className="message message-assistant loading">
             <div className="message-avatar">🤖</div>
             <div className="message-content">
-              <Loader className="spinner" size={20} />
+              <div className="message-text capturing">
+                <Loader className="spinner" size={16} /> Looking at your screen…
+              </div>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {screenshot && (
-        <div className="screenshot-preview">
-          <img src={`file://${screenshot}`} alt="Current screenshot" />
-          <button className="remove-btn" onClick={() => onScreenshot()}>
-            ✕
-          </button>
-        </div>
-      )}
-
       <div className="chat-input-area">
-        <div className="input-actions">
-          <button
-            className="action-btn"
-            onClick={onScreenshot}
-            title="Take Screenshot"
-          >
-            <Camera size={20} />
-          </button>
-        </div>
-
         <div className="input-wrapper">
           <input
             ref={inputRef}
@@ -125,14 +103,10 @@ export default function ChatInterface({
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask about the screen or give commands..."
+            placeholder="Ask anything about your screen…"
             disabled={loading}
           />
-          <button
-            className="send-btn"
-            onClick={() => onSend()}
-            disabled={!input.trim() || loading}
-          >
+          <button className="send-btn" onClick={() => onSend()} disabled={!input.trim() || loading} aria-label="Send">
             {loading ? <Loader className="spinner" size={20} /> : <Send size={20} />}
           </button>
         </div>

@@ -205,3 +205,27 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
+
+/* ---- v0.1.1: provider picker ---- */
+.provider-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.provider-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 2px solid var(--border, #e0e0e0);
+  background: #fff;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.provider-chip:hover { border-color: #667eea; }
+.provider-chip.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+.chip-icon { font-size: 16px; }
