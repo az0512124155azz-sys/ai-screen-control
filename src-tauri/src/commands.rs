@@ -205,12 +205,16 @@ async fn ask_gemini(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
     }
     let body = serde_json::json!({ "contents": [{ "parts": parts }] });
 
+    // Authenticate with the x-goog-api-key header (works for both the legacy
+    // AIza... keys and the new AQ.... auth keys). The old ?key= query param is
+    // rejected for the new-format keys.
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-        req.model, req.api_key
+        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+        req.model
     );
     let resp = reqwest::Client::new()
         .post(&url)
+        .header("x-goog-api-key", &req.api_key)
         .json(&body)
         .send()
         .await
