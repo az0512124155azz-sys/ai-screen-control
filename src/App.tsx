@@ -13,7 +13,7 @@ interface Message {
 
 type View = 'bubble' | 'chat' | 'settings';
 
-const BUBBLE = { w: 96, h: 96 };
+const BUBBLE = { w: 60, h: 60 };
 const PANEL = { w: 400, h: 620 };
 
 const DEFAULT_CONFIG: ProviderConfig = { provider: 'claude', claudeKey: '', openaiKey: '', geminiKey: '' };
@@ -65,6 +65,26 @@ export default function App() {
   const open = () => { setView('chat'); setWindow(true); };
   const minimize = () => { setView('bubble'); setWindow(false); };
 
+  // Bubble interaction: quick tap opens the chat; press-and-hold drags the
+  // bubble anywhere on screen (so the user can move it wherever they like).
+  const holdTimer = useRef<number | null>(null);
+  const draggingRef = useRef(false);
+
+  const onBubbleDown = () => {
+    draggingRef.current = false;
+    holdTimer.current = window.setTimeout(async () => {
+      draggingRef.current = true;
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().startDragging();
+      } catch { /* browser preview */ }
+    }, 150);
+  };
+  const onBubbleUp = () => {
+    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+    if (!draggingRef.current) open();
+  };
+
   const addMessage = (role: Message['role'], content: string) =>
     setMessages((p) => [...p, { role, content, id: `${Date.now()}-${Math.random()}`, timestamp: new Date() }]);
 
@@ -92,7 +112,13 @@ export default function App() {
   if (view === 'bubble') {
     return (
       <div className="bubble-root">
-        <button className="global-bubble" onClick={open} aria-label="Open AI Screen Control" title="Ask about your screen">
+        <button
+          className="global-bubble"
+          onPointerDown={onBubbleDown}
+          onPointerUp={onBubbleUp}
+          aria-label="Open AI Screen Control"
+          title="Tap to open · hold to move"
+        >
           <span className="bubble-emoji">🤖</span>
           {messages.length > 0 && <span className="bubble-badge">{messages.length}</span>}
         </button>
