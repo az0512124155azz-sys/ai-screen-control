@@ -308,3 +308,20 @@
   color: #667eea;
   font-style: italic;
 }
+
+/* header actions: provider badge + minimize */
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.minimize-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.minimize-btn:hover { background: rgba(255, 255, 255, 0.34); }

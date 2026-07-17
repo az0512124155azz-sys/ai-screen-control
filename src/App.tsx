@@ -11,12 +11,12 @@ interface Message {
   timestamp: Date;
 }
 
-const DEFAULT_CONFIG: ProviderConfig = {
-  provider: 'claude',
-  claudeKey: '',
-  openaiKey: '',
-  geminiKey: '',
-};
+type View = 'bubble' | 'chat' | 'settings';
+
+const BUBBLE = { w: 96, h: 96 };
+const PANEL = { w: 400, h: 620 };
+
+const DEFAULT_CONFIG: ProviderConfig = { provider: 'claude', claudeKey: '', openaiKey: '', geminiKey: '' };
 
 function loadConfig(): ProviderConfig {
   try {
@@ -25,54 +25,61 @@ function loadConfig(): ProviderConfig {
     return DEFAULT_CONFIG;
   }
 }
+const keyFor = (c: ProviderConfig) =>
+  c.provider === 'openai' ? c.openaiKey : c.provider === 'gemini' ? c.geminiKey : c.claudeKey;
+const modelFor = (p: Provider) => PROVIDERS.find((x) => x.id === p)!.model;
 
-function keyFor(cfg: ProviderConfig): string {
-  return cfg.provider === 'openai' ? cfg.openaiKey : cfg.provider === 'gemini' ? cfg.geminiKey : cfg.claudeKey;
-}
-
-function modelFor(provider: Provider): string {
-  return PROVIDERS.find((p) => p.id === provider)!.model;
+// Resize + reposition the always-on-top overlay window between the tiny bubble
+// and the full chat panel. Guards let it run harmlessly in a plain browser.
+async function setWindow(expanded: boolean) {
+  try {
+    const { getCurrentWindow, LogicalSize, LogicalPosition } = await import('@tauri-apps/api/window');
+    const win = getCurrentWindow();
+    const sw = window.screen.availWidth;
+    const sh = window.screen.availHeight;
+    if (expanded) {
+      await win.setSize(new LogicalSize(PANEL.w, PANEL.h));
+      await win.setPosition(new LogicalPosition(Math.max(0, sw - PANEL.w - 20), Math.max(0, sh - PANEL.h - 40)));
+      await win.setFocus();
+    } else {
+      await win.setSize(new LogicalSize(BUBBLE.w, BUBBLE.h));
+      await win.setPosition(new LogicalPosition(Math.max(0, sw - BUBBLE.w - 28), Math.max(0, sh - BUBBLE.h - 60)));
+    }
+  } catch {
+    /* running in a normal browser (preview) — nothing to resize */
+  }
 }
 
 export default function App() {
+  const [view, setView] = useState<View>('bubble');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [config, setConfig] = useState<ProviderConfig>(loadConfig());
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    localStorage.setItem('ai_config', JSON.stringify(config));
-  }, [config]);
+  // Start collapsed as a small bubble in the bottom-right of the desktop.
+  useEffect(() => { setWindow(false); }, []);
+  useEffect(() => { localStorage.setItem('ai_config', JSON.stringify(config)); }, [config]);
+
+  const open = () => { setView('chat'); setWindow(true); };
+  const minimize = () => { setView('bubble'); setWindow(false); };
 
   const addMessage = (role: Message['role'], content: string) =>
-    setMessages((prev) => [...prev, { role, content, id: `${Date.now()}-${Math.random()}`, timestamp: new Date() }]);
+    setMessages((p) => [...p, { role, content, id: `${Date.now()}-${Math.random()}`, timestamp: new Date() }]);
 
   const sendMessage = async (text?: string) => {
     const question = (text ?? input).trim();
     if (!question || loading) return;
-
     const apiKey = keyFor(config);
-    if (!apiKey) {
-      setShowSettings(true);
-      return;
-    }
+    if (!apiKey) { setView('settings'); return; }
 
     addMessage('user', question);
     setInput('');
     setLoading(true);
-
     try {
-      // The app captures the screen automatically — the user never uploads anything.
       const result: any = await invoke('ask', {
-        request: {
-          question,
-          provider: config.provider,
-          apiKey,
-          model: modelFor(config.provider),
-          captureScreen: true,
-        },
+        request: { question, provider: config.provider, apiKey, model: modelFor(config.provider), captureScreen: true },
       });
       addMessage('assistant', result?.response ?? 'No response');
     } catch (err) {
@@ -82,12 +89,23 @@ export default function App() {
     }
   };
 
-  if (showSettings) {
+  if (view === 'bubble') {
+    return (
+      <div className="bubble-root">
+        <button className="global-bubble" onClick={open} aria-label="Open AI Screen Control" title="Ask about your screen">
+          <span className="bubble-emoji">🤖</span>
+          {messages.length > 0 && <span className="bubble-badge">{messages.length}</span>}
+        </button>
+      </div>
+    );
+  }
+
+  if (view === 'settings') {
     return (
       <SettingsPanel
         config={config}
-        onSave={(c) => { setConfig(c); setShowSettings(false); }}
-        onClose={() => setShowSettings(false)}
+        onSave={(c) => { setConfig(c); setView('chat'); }}
+        onClose={() => setView('chat')}
       />
     );
   }
@@ -102,7 +120,8 @@ export default function App() {
         loading={loading}
         inputRef={inputRef}
         provider={config.provider}
-        openSettings={() => setShowSettings(true)}
+        openSettings={() => setView('settings')}
+        onMinimize={minimize}
       />
     </div>
   );

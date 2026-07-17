@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Send, Settings, MessageSquare, Loader, Monitor } from 'lucide-react';
+import { Send, Settings, MessageSquare, Loader, Monitor, Minus } from 'lucide-react';
 import type { Provider } from './SettingsPanel';
 import '../styles/ChatInterface.css';
 
@@ -19,6 +19,7 @@ interface ChatInterfaceProps {
   inputRef: React.RefObject<HTMLInputElement>;
   provider: Provider;
   openSettings: () => void;
+  onMinimize: () => void;
 }
 
 const PROVIDER_LABEL: Record<Provider, string> = {
@@ -36,6 +37,7 @@ export default function ChatInterface({
   inputRef,
   provider,
   openSettings,
+  onMinimize,
 }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -57,10 +59,15 @@ export default function ChatInterface({
           <MessageSquare size={20} />
           <span>AI Screen Control</span>
         </div>
-        <button className="provider-badge" onClick={openSettings} title="Change AI / settings">
-          {PROVIDER_LABEL[provider]}
-          <Settings size={15} />
-        </button>
+        <div className="header-actions">
+          <button className="provider-badge" onClick={openSettings} title="Change AI / settings">
+            {PROVIDER_LABEL[provider]}
+            <Settings size={15} />
+          </button>
+          <button className="minimize-btn" onClick={onMinimize} title="Minimize to bubble" aria-label="Minimize to bubble">
+            <Minus size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="chat-messages">
