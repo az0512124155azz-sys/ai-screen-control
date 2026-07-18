@@ -339,3 +339,12 @@
 .screen-toggle.on  { background: rgba(102,126,234,0.15); color: #667eea; }
 .screen-toggle.off { background: #eef0f4; color: #94a3b8; }
 .screen-toggle:hover { filter: brightness(0.96); }
+
+/* AI disclaimer under the input (like every AI app) */
+.ai-disclaimer {
+  text-align: center;
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 6px 12px 10px;
+  margin: 0;
+}
