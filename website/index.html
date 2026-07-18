@@ -562,6 +562,25 @@
     .code-hint { color: #94a3b8; font-size: 13px; }
     .code-actions button { background: var(--gradient); color: #fff; border: none; padding: 10px 18px; border-radius: 10px; font-weight: 700; cursor: pointer; font-family: inherit; }
 
+    /* Admin messages inbox */
+    #msgInbox { position: fixed; inset: 0; z-index: 3200; background: #0b1020; display: flex; flex-direction: column; }
+    #msgInbox[hidden] { display: none; }
+    .inbox-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: #0f172a; color: #fff; font-weight: 700; }
+    .inbox-head button { background: rgba(255,255,255,0.15); border: none; color: #fff; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
+    .inbox-body { flex: 1; display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+    .inbox-list { border-right: 1px solid rgba(255,255,255,0.1); overflow-y: auto; background: #0e1428; }
+    .inbox-item { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); color: #cbd5e1; cursor: pointer; font-size: 13px; }
+    .inbox-item:hover, .inbox-item.active { background: rgba(102,126,234,0.15); color: #fff; }
+    .inbox-item .who { font-weight: 700; color: #a5b4fc; }
+    .inbox-thread { display: flex; flex-direction: column; min-height: 0; }
+    .inbox-log { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+    .inbox-empty { color: #64748b; text-align: center; margin-top: 40px; }
+    .inbox-log .s-msg { max-width: 70%; }
+    .inbox-reply { display: flex; gap: 8px; padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .inbox-reply input { flex: 1; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: #0b1020; color: #fff; outline: none; }
+    .inbox-reply button { background: var(--gradient); color: #fff; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    @media (max-width: 640px) { .inbox-body { grid-template-columns: 1fr; } .inbox-list { max-height: 30vh; } }
+
     /* Cookie consent banner */
     .cookie-banner {
       position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 2500;
@@ -962,6 +981,24 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
     </div>
   </div>
 
+  <!-- ===== ADMIN MESSAGES INBOX ===== -->
+  <div id="msgInbox" hidden>
+    <div class="inbox-head">
+      <span>📨 Support messages</span>
+      <button onclick="document.getElementById('msgInbox').hidden=true" aria-label="Close">✕</button>
+    </div>
+    <div class="inbox-body">
+      <div id="inboxList" class="inbox-list"></div>
+      <div id="inboxThread" class="inbox-thread">
+        <div id="inboxLog" class="inbox-log"><p class="inbox-empty">Select a conversation on the left.</p></div>
+        <div id="inboxReply" class="inbox-reply" hidden>
+          <input id="inboxReplyText" type="text" placeholder="Type your reply…" onkeydown="if(event.key==='Enter'){adminReply();}">
+          <button onclick="adminReply()">Reply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== COOKIE CONSENT ===== -->
   <div id="cookieBanner" class="cookie-banner" hidden>
     <p>🍪 This site uses cookies to remember your preferences and so we can reply to your support messages. By continuing, you agree.</p>
@@ -980,8 +1017,33 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-// OS display config
+    /* ======================================================================
+       BACKEND (Supabase) — paste your 2 values here to switch everything on.
+       Get them at supabase.com → your project → Settings → API.
+       Leave empty and the chat runs in local demo mode.
+    ====================================================================== */
+    var SUPABASE_URL = '';        // e.g. https://xxxx.supabase.co
+    var SUPABASE_ANON_KEY = '';   // the "anon public" key
+
+    var sb = null;
+    try {
+      if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+    } catch (e) { sb = null; }
+    function backendOn() { return !!sb; }
+
+    // A stable id for this visitor's conversation.
+    function chatSession() {
+      var s = null;
+      try { s = localStorage.getItem('chatSession'); } catch (e) {}
+      if (!s) { s = 'v-' + Math.random().toString(36).slice(2) + '-' + (new Date().getTime()); try { localStorage.setItem('chatSession', s); } catch (e) {} }
+      return s;
+    }
+
+    // OS display config
     var OS_CONFIG = {
       windows: { name: 'Windows', icon: '🪟' },
       macos:   { name: 'macOS',   icon: '🍎' },
@@ -1420,14 +1482,50 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
       supportFiles = f;
       if (f && f.length) supportAddMsg('📎 ' + f.length + ' file(s) attached', 'me');
     }
+    var visitorSubscribed = false;
     function sendSupport() {
       var t = document.getElementById('supportMsg').value.trim();
       if (!t) return;
       supportAddMsg(t, 'me');
       document.getElementById('supportMsg').value = '';
-      setTimeout(function () {
-        supportAddMsg('Thanks! Your message is noted. A team member will reply here shortly. 🙌', 'bot');
-      }, 500);
+      if (backendOn()) {
+        sb.from('messages').insert({ session: chatSession(), sender: 'visitor', text: t })
+          .then(function () {}, function () { supportAddMsg('(Could not send — check your connection.)', 'bot'); });
+        subscribeVisitor();
+      } else {
+        setTimeout(function () {
+          supportAddMsg('Thanks! Your message is noted. (Connect a backend so the team can reply here.)', 'bot');
+        }, 400);
+      }
+    }
+    // Load this visitor's past messages and listen for owner replies in real time.
+    function loadVisitorChat() {
+      if (!backendOn()) return;
+      sb.from('messages').select('*').eq('session', chatSession()).order('created_at', { ascending: true })
+        .then(function (res) {
+          var log = document.getElementById('supportLog');
+          if (log && res.data) {
+            log.querySelectorAll('.s-msg.loaded').forEach(function (n) { n.remove(); });
+            res.data.forEach(function (m) {
+              var d = document.createElement('div');
+              d.className = 's-msg loaded ' + (m.sender === 'visitor' ? 'me' : 'bot');
+              d.textContent = m.text; log.appendChild(d);
+            });
+            log.scrollTop = log.scrollHeight;
+          }
+        });
+      subscribeVisitor();
+    }
+    function subscribeVisitor() {
+      if (!backendOn() || visitorSubscribed) return;
+      visitorSubscribed = true;
+      sb.channel('vchat-' + chatSession())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'session=eq.' + chatSession() },
+          function (payload) {
+            var m = payload['new'];
+            if (m.sender !== 'visitor') supportAddMsg(m.text, 'bot');
+          })
+        .subscribe();
     }
 
     // ---- Secret admin edit area (no backend, no WordPress) ----
@@ -1457,7 +1555,8 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
       });
       var bar = document.createElement('div');
       bar.id = 'adminBar';
-      bar.innerHTML = '✏️ Edit mode — click any text to change it. ' +
+      bar.innerHTML = '✏️ Edit mode. ' +
+        '<button onclick="adminMessages()">📨 Messages</button>' +
         '<button onclick="adminSave()">💾 Save text</button>' +
         '<button onclick="openCodeEditor()">&lt;/&gt; Edit full code</button>' +
         '<button class="exit" onclick="location.reload()">Exit</button>';
@@ -1485,6 +1584,54 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(url); }, 800);
       alert('Downloaded! Upload this "standalone.html" to update your live site (or send it to me).');
+    }
+
+    // ---- Admin inbox: view conversations and reply ----
+    var currentSession = null;
+    function adminMessages() {
+      if (!backendOn()) {
+        alert('To receive and reply to messages, connect a backend first:\n\n1) Create a free project at supabase.com\n2) Paste your Project URL and anon key into the SUPABASE_URL / SUPABASE_ANON_KEY lines at the top of the code\n3) Run the provided table SQL.\n\nThen this inbox fills with real messages.');
+        return;
+      }
+      document.getElementById('msgInbox').hidden = false;
+      loadInbox();
+    }
+    function loadInbox() {
+      sb.from('messages').select('*').order('created_at', { ascending: true }).then(function (res) {
+        var byS = {};
+        (res.data || []).forEach(function (m) { (byS[m.session] = byS[m.session] || []).push(m); });
+        var list = document.getElementById('inboxList'); list.innerHTML = '';
+        var keys = Object.keys(byS);
+        if (!keys.length) { list.innerHTML = '<div class="inbox-item">No messages yet.</div>'; return; }
+        keys.forEach(function (s) {
+          var msgs = byS[s]; var last = msgs[msgs.length - 1];
+          var item = document.createElement('div');
+          item.className = 'inbox-item' + (s === currentSession ? ' active' : '');
+          item.innerHTML = '<div class="who">Visitor ' + s.slice(2, 8) + '</div>' + last.text.slice(0, 40);
+          item.onclick = function () { openThread(s); };
+          list.appendChild(item);
+        });
+      });
+    }
+    function openThread(s) {
+      currentSession = s;
+      document.getElementById('inboxReply').hidden = false;
+      loadInbox();
+      sb.from('messages').select('*').eq('session', s).order('created_at', { ascending: true }).then(function (res) {
+        var log = document.getElementById('inboxLog'); log.innerHTML = '';
+        (res.data || []).forEach(function (m) {
+          var d = document.createElement('div');
+          d.className = 's-msg ' + (m.sender === 'visitor' ? 'bot' : 'me');
+          d.textContent = m.text; log.appendChild(d);
+        });
+        log.scrollTop = log.scrollHeight;
+      });
+    }
+    function adminReply() {
+      var box = document.getElementById('inboxReplyText'); var t = box.value.trim();
+      if (!t || !currentSession) return;
+      box.value = '';
+      sb.from('messages').insert({ session: currentSession, sender: 'owner', text: t }).then(function () { openThread(currentSession); });
     }
 
     // Cookie consent
@@ -1556,6 +1703,7 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
       el.classList.add('active');
       el.querySelectorAll('.reveal').forEach(function (r) { r.classList.add('in'); });
       window.scrollTo(0, 0);
+      if (name === 'support') loadVisitorChat();
       try { history.replaceState(null, '', name === 'home' ? './' : '#' + name); } catch (e) {}
     }
     function goHomeThen(hash) {
