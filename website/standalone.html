@@ -123,9 +123,14 @@
     .mockup {
       background: white; border-radius: 16px; padding: 24px;
       box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
-      transform: perspective(1000px) rotateY(-5px); transition: transform 0.3s ease;
+      transform: perspective(1000px) rotateY(-5px); transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      animation: floaty 6s ease-in-out infinite;
     }
-    .mockup:hover { transform: perspective(1000px) rotateY(0deg); }
+    .mockup:hover { transform: perspective(1000px) rotateY(0deg) translateY(-4px); animation-play-state: paused; }
+    @keyframes floaty {
+      0%, 100% { transform: perspective(1000px) rotateY(-5px) translateY(0); }
+      50%      { transform: perspective(1000px) rotateY(-5px) translateY(-12px); }
+    }
     .mockup-screen {
       background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
       border-radius: 12px; padding: 24px; height: 320px;
@@ -154,7 +159,7 @@
       background: white; padding: 40px 32px; border-radius: 16px; text-align: center;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
       /* bouncy lift on hover */
-      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+      transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
       border: 1px solid var(--border); position: relative; overflow: hidden;
     }
     .feature-card::before {
@@ -163,7 +168,7 @@
     }
     .feature-card:hover { transform: translateY(-16px) scale(1.02); box-shadow: 0 22px 48px rgba(102, 126, 234, 0.22); }
     .feature-card:hover::before { transform: scaleX(1); }
-    .feature-icon { font-size: 56px; margin-bottom: 20px; transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+    .feature-icon { font-size: 56px; margin-bottom: 20px; transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
     .feature-card:hover .feature-icon { transform: scale(1.18) translateY(-2px); }
     .feature-card h3 { margin-bottom: 12px; color: var(--text); font-size: 20px; font-weight: 700; }
     .feature-card p { color: var(--text-light); font-size: 15px; line-height: 1.6; }
@@ -183,7 +188,7 @@
     .localai-step {
       background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
       border-radius: 16px; padding: 24px; position: relative;
-      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease;
+      transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease;
     }
     .localai-step:hover { transform: translateY(-10px); background: rgba(255,255,255,0.1); }
     .step-num {
@@ -212,11 +217,11 @@
     .os-card {
       background: white; border: 2px solid var(--border); border-radius: 16px;
       padding: 40px 32px; text-align: center;
-      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+      transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
       position: relative; overflow: hidden;
     }
     .os-card:hover { border-color: var(--primary); box-shadow: 0 22px 48px rgba(102, 126, 234, 0.2); transform: translateY(-14px) scale(1.02); }
-    .os-icon { font-size: 64px; margin-bottom: 20px; transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+    .os-icon { font-size: 64px; margin-bottom: 20px; transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
     .os-card:hover .os-icon { transform: scale(1.15) translateY(-2px); }
     .os-card h3 { color: var(--text); margin-bottom: 8px; font-size: 24px; font-weight: 700; }
     .os-card > p { color: var(--text-light); font-size: 14px; margin-bottom: 24px; }
@@ -263,7 +268,7 @@
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06); transition: all 0.3s ease;
       border: 1px solid var(--border); border-left: 5px solid var(--primary);
     }
-    .doc-card { transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease; }
+    .doc-card { transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease; }
     .doc-card:hover { transform: translateY(-12px) scale(1.015); box-shadow: 0 20px 44px rgba(102, 126, 234, 0.2); }
     .doc-card h3 { margin-bottom: 12px; color: var(--text); font-size: 18px; font-weight: 700; }
     .doc-card p { color: var(--text-light); font-size: 15px; line-height: 1.6; }
@@ -440,6 +445,11 @@
       .nav-links { gap: 20px; font-size: 13px; }
       .modal-body { padding: 24px; }
     }
+
+    /* Smooth scroll-reveal for cards/sections */
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1); will-change: opacity, transform; }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1 !important; transform: none !important; } }
   </style>
 </head>
 <body>
@@ -1102,6 +1112,30 @@
         if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
       });
     });
+
+    // Reveal cards/sections smoothly as they scroll into view, with a gentle stagger.
+    (function () {
+      var items = document.querySelectorAll(
+        '.feature-card, .os-card, .doc-card, .localai-step, .step, .faq-item, .localai-card'
+      );
+      if (!('IntersectionObserver' in window)) {
+        items.forEach(function (el) { el.classList.add('in'); });
+        return;
+      }
+      items.forEach(function (el) { el.classList.add('reveal'); });
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            var el = entry.target;
+            var group = el.parentElement ? Array.prototype.indexOf.call(el.parentElement.children, el) : 0;
+            el.style.transitionDelay = Math.min(group, 5) * 70 + 'ms';
+            el.classList.add('in');
+            io.unobserve(el);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+      items.forEach(function (el) { io.observe(el); });
+    })();
   </script>
 </body>
 </html>
