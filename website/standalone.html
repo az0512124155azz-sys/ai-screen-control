@@ -150,15 +150,25 @@
     .chat-bubble {
       background: var(--gradient); color: white; padding: 14px 18px;
       border-radius: 14px; width: fit-content; max-width: 85%; font-size: 14px;
-      animation: slideIn 0.6s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); font-weight: 500;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); font-weight: 500;
+      animation: pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
     }
+    .chat-bubble:nth-child(2) { animation-delay: 0.25s; }
+    .chat-bubble:nth-child(3) { animation-delay: 0.5s; }
+    /* the last bubble keeps gently jumping to feel alive */
+    .chat-bubble:last-child { animation: pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both, jump 2.2s ease-in-out 1.2s infinite; }
     .chat-bubble.response {
       background: #ffffff; color: #333; align-self: flex-end;
       border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(10px) translateX(-10px); }
-      to { opacity: 1; transform: translateY(0) translateX(0); }
+    @keyframes pop {
+      0%   { opacity: 0; transform: translateY(16px) scale(0.9); }
+      60%  { opacity: 1; transform: translateY(-5px) scale(1.03); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes jump {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-7px); }
     }
 
     /* Features */
@@ -183,20 +193,6 @@
     .feature-card:hover .feature-icon { transform: scale(1.18) translateY(-2px); }
     .feature-card h3 { margin-bottom: 12px; color: var(--text); font-size: 21px; font-weight: 600; }
     .feature-card p { color: var(--text-light); font-size: 15px; line-height: 1.6; }
-    /* playful color-coded cards + rounded icon tiles */
-    .feature-card { border-radius: 24px; border: 1.5px solid transparent; }
-    .feature-icon {
-      width: 80px; height: 80px; border-radius: 24px; margin: 0 auto 20px;
-      display: flex; align-items: center; justify-content: center; font-size: 40px;
-      box-shadow: 0 8px 18px rgba(15,23,42,0.08);
-    }
-    .feature-card:nth-child(6n+1) { background: #f2efff; } .feature-card:nth-child(6n+1) .feature-icon { background: #e0d8ff; }
-    .feature-card:nth-child(6n+2) { background: #e6faf3; } .feature-card:nth-child(6n+2) .feature-icon { background: #c9f2e4; }
-    .feature-card:nth-child(6n+3) { background: #fff2ea; } .feature-card:nth-child(6n+3) .feature-icon { background: #ffd9c4; }
-    .feature-card:nth-child(6n+4) { background: #eaf3ff; } .feature-card:nth-child(6n+4) .feature-icon { background: #cfe4ff; }
-    .feature-card:nth-child(6n+5) { background: #fdf0f6; } .feature-card:nth-child(6n+5) .feature-icon { background: #ffd3e6; }
-    .feature-card:nth-child(6n+6) { background: #fff7de; } .feature-card:nth-child(6n+6) .feature-icon { background: #ffe9a8; }
-    .feature-card::before { display: none; }
 
     /* Local AI (Ollama) spotlight */
     .localai { padding: 90px 0; background: white; }
@@ -233,6 +229,26 @@
       margin-top: 30px; color: #cbd5e1; font-size: 14px; line-height: 1.7;
       background: rgba(255,255,255,0.05); border-radius: 12px; padding: 16px 20px;
     }
+
+    /* Reviews & contact */
+    .reviews { padding: 90px 0; background: var(--light); }
+    .reviews h2 { text-align: center; font-size: 44px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+    .reviews-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 28px; margin-top: 10px; align-items: start; }
+    .review-form { background: #fff; border: 1px solid var(--border); border-radius: 22px; padding: 32px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 8px 30px rgba(15,23,42,0.05); }
+    .review-form label { font-weight: 700; font-size: 14px; margin-top: 10px; }
+    .review-form input, .review-form select, .review-form textarea {
+      border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+      font-size: 15px; font-family: inherit; outline: none; transition: all 0.2s ease;
+    }
+    .review-form input:focus, .review-form select:focus, .review-form textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
+    .file-label { font-weight: 600 !important; color: var(--text-light); }
+    .review-send { margin-top: 18px; border: none; cursor: pointer; color: #fff; }
+    .reviews-note { background: linear-gradient(135deg, #f2efff, #eaf3ff); border: 1px solid #e3ddff; border-radius: 22px; padding: 28px; }
+    .reviews-note h3 { font-size: 18px; margin-bottom: 10px; color: var(--primary); }
+    .reviews-note p { color: var(--text-light); font-size: 14px; line-height: 1.7; }
+    .reviews-note hr { border: none; border-top: 1px solid rgba(0,0,0,0.08); margin: 16px 0; }
+    .reviews-note .soon { color: var(--text); }
+    @media (max-width: 768px) { .reviews-grid { grid-template-columns: 1fr; } .reviews h2 { font-size: 32px; } }
 
     /* Download */
     .download { padding: 100px 0; background: white; }
@@ -314,6 +330,14 @@
     }
     footer p { margin: 8px 0; font-size: 15px; opacity: 0.9; }
     footer a { color: white; text-decoration: none; }
+    .footer-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+    .footer-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px;
+      transition: all 0.2s ease;
+    }
+    .footer-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
 
     /* ===== MODAL ===== */
     .modal-overlay {
@@ -495,9 +519,9 @@
       </div>
       <ul class="nav-links">
         <li><a href="#features">Features</a></li>
-        <li><a href="#local-ai">Free Local AI</a></li>
+        <li><a href="#local-ai">Free AI</a></li>
         <li><a href="#download">Download</a></li>
-        <li><a href="#docs">Docs</a></li>
+        <li><a href="#reviews">Reviews</a></li>
       </ul>
     </div>
   </nav>
@@ -748,6 +772,44 @@
     </div>
   </section>
 
+  <section id="reviews" class="reviews">
+    <div class="container">
+      <h2>Reviews &amp; Contact</h2>
+      <p class="section-subtitle">Tell us what you think — a complaint, an idea, or something you loved.</p>
+
+      <div class="reviews-grid">
+        <form class="review-form" id="reviewForm" onsubmit="submitReview(event)">
+          <label for="rv-name">Your name</label>
+          <input id="rv-name" type="text" placeholder="Jane" required>
+
+          <label for="rv-rating">Rating</label>
+          <select id="rv-rating">
+            <option value="5">★★★★★ Loved it</option>
+            <option value="4">★★★★ Good</option>
+            <option value="3">★★★ Okay</option>
+            <option value="2">★★ Needs work</option>
+            <option value="1">★ Had a problem</option>
+          </select>
+
+          <label for="rv-msg">Your message</label>
+          <textarea id="rv-msg" rows="4" placeholder="What's on your mind?" required></textarea>
+
+          <label for="rv-file" class="file-label">📎 Attach an image, video or file (optional)</label>
+          <input id="rv-file" type="file" accept="image/*,video/*,.pdf,.txt,.srt,.vtt" multiple>
+
+          <button type="submit" class="btn btn-gradient review-send">Send feedback</button>
+        </form>
+
+        <aside class="reviews-note">
+          <h3>💬 How this works</h3>
+          <p>Your message opens in your email app and comes straight to us. We read every one and reply.</p>
+          <hr>
+          <p class="soon"><strong>Coming soon:</strong> live on-page reviews, two-way chat with file &amp; video sharing, and replies right here on the site — that needs a small backend, which we can switch on.</p>
+        </aside>
+      </div>
+    </div>
+  </section>
+
   <section id="accessibility" class="a11y" aria-labelledby="a11y-title">
     <div class="container">
       <h2 id="a11y-title">Accessibility Statement</h2>
@@ -779,12 +841,13 @@
 
   <footer>
     <div class="container">
+      <div class="footer-buttons">
+        <a href="#accessibility" class="footer-btn">♿ Accessibility Statement</a>
+        <a href="#reviews" class="footer-btn">💬 Reviews &amp; Contact</a>
+        <a href="https://github.com/az0512124155azz-sys/ai-screen-control" target="_blank" rel="noopener" class="footer-btn">📂 GitHub</a>
+      </div>
       <p><strong>AI Screen Control</strong> • © 2026 • All rights reserved</p>
       <p>Made with ❤️ for creators, developers, and AI enthusiasts</p>
-      <p style="margin-top:14px;">
-        <a href="#accessibility">Accessibility Statement</a> &nbsp;•&nbsp;
-        <a href="https://github.com/az0512124155azz-sys/ai-screen-control" target="_blank" rel="noopener">GitHub</a>
-      </p>
     </div>
   </footer>
 
@@ -1204,6 +1267,21 @@
         }
       }
     });
+
+    // Reviews form — sends feedback to the owner by email (works on a static site).
+    // ▸ Change REVIEWS_EMAIL to your real email address.
+    var REVIEWS_EMAIL = 'you@example.com';
+    function submitReview(e) {
+      e.preventDefault();
+      var name = document.getElementById('rv-name').value;
+      var rating = document.getElementById('rv-rating').value;
+      var msg = document.getElementById('rv-msg').value;
+      var files = document.getElementById('rv-file').files;
+      var note = files && files.length ? ('\n\n(' + files.length + ' file(s) selected — please attach them in your email.)') : '';
+      var subject = encodeURIComponent('AI Screen Control feedback (' + rating + '★) from ' + name);
+      var body = encodeURIComponent(msg + note + '\n\n— ' + name);
+      window.location.href = 'mailto:' + REVIEWS_EMAIL + '?subject=' + subject + '&body=' + body;
+    }
 
     // Smooth scroll for nav
     document.querySelectorAll('a[href^="#"]').forEach(function (a) {
