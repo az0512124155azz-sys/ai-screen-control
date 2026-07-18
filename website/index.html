@@ -552,6 +552,27 @@
     .admin-go { background: var(--gradient); color: #fff; }
     .admin-cancel { background: var(--light); color: var(--text); }
 
+    /* Full code editor */
+    #codeEditor { position: fixed; inset: 0; z-index: 3200; background: #0b1020; display: flex; flex-direction: column; }
+    #codeEditor[hidden] { display: none; }
+    .code-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: #0f172a; color: #fff; font-weight: 700; }
+    .code-head button { background: rgba(255,255,255,0.15); border: none; color: #fff; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
+    #codeArea { flex: 1; width: 100%; border: none; resize: none; padding: 16px; background: #0b1020; color: #d6e2ff; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; outline: none; }
+    .code-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; background: #0f172a; }
+    .code-hint { color: #94a3b8; font-size: 13px; }
+    .code-actions button { background: var(--gradient); color: #fff; border: none; padding: 10px 18px; border-radius: 10px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+    /* Cookie consent banner */
+    .cookie-banner {
+      position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 2500;
+      max-width: 720px; margin: 0 auto; background: #0f172a; color: #fff;
+      border-radius: 14px; padding: 16px 20px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center;
+    }
+    .cookie-banner[hidden] { display: none; }
+    .cookie-banner p { font-size: 14px; line-height: 1.5; margin: 0; flex: 1; min-width: 220px; }
+    .cookie-banner button { background: var(--gradient); color: #fff; border: none; padding: 10px 22px; border-radius: 10px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+
     /* Admin edit bar */
     #adminBar {
       position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
@@ -926,6 +947,25 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
         <button type="button" class="admin-cancel" onclick="document.getElementById('adminLogin').hidden=true">Cancel</button>
       </div>
     </form>
+  </div>
+
+  <!-- ===== FULL CODE EDITOR (admin) ===== -->
+  <div id="codeEditor" hidden>
+    <div class="code-head">
+      <span>&lt;/&gt; Edit full site code</span>
+      <button onclick="document.getElementById('codeEditor').hidden=true" aria-label="Close">✕</button>
+    </div>
+    <textarea id="codeArea" spellcheck="false"></textarea>
+    <div class="code-actions">
+      <span class="code-hint">Edit anything — HTML, styles, scripts — then download and re-upload.</span>
+      <button onclick="downloadCode()">💾 Download edited file</button>
+    </div>
+  </div>
+
+  <!-- ===== COOKIE CONSENT ===== -->
+  <div id="cookieBanner" class="cookie-banner" hidden>
+    <p>🍪 This site uses cookies to remember your preferences and so we can reply to your support messages. By continuing, you agree.</p>
+    <button onclick="acceptCookies()">Got it</button>
   </div>
 
   <div class="modal-overlay" id="downloadModal">
@@ -1417,12 +1457,45 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
       });
       var bar = document.createElement('div');
       bar.id = 'adminBar';
-      bar.innerHTML = '✏️ Edit mode — click any text and type to change it. ' +
-        '<button onclick="adminSave()">💾 Save &amp; download</button>' +
+      bar.innerHTML = '✏️ Edit mode — click any text to change it. ' +
+        '<button onclick="adminSave()">💾 Save text</button>' +
+        '<button onclick="openCodeEditor()">&lt;/&gt; Edit full code</button>' +
         '<button class="exit" onclick="location.reload()">Exit</button>';
       document.body.appendChild(bar);
       document.body.style.paddingTop = '48px';
     }
+
+    // Full code control: edit the entire page source and download it.
+    function openCodeEditor() {
+      var clone = document.documentElement.cloneNode(true);
+      ['adminBar', 'codeEditor', 'adminLogin', 'cookieBanner'].forEach(function (id) {
+        var e = clone.querySelector('#' + id); if (e) e.remove();
+      });
+      clone.querySelectorAll('[contenteditable]').forEach(function (e) { e.removeAttribute('contenteditable'); });
+      var cls = clone.querySelector('body'); if (cls) cls.classList.remove('admin-editing');
+      document.getElementById('codeArea').value = '<!DOCTYPE html>\n' + clone.outerHTML;
+      document.getElementById('codeEditor').hidden = false;
+    }
+    function downloadCode() {
+      var html = document.getElementById('codeArea').value;
+      var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'standalone.html';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 800);
+      alert('Downloaded! Upload this "standalone.html" to update your live site (or send it to me).');
+    }
+
+    // Cookie consent
+    function acceptCookies() {
+      try { localStorage.setItem('cookiesAccepted', '1'); } catch (e) {}
+      var b = document.getElementById('cookieBanner'); if (b) b.hidden = true;
+    }
+    window.addEventListener('load', function () {
+      var ok = false; try { ok = localStorage.getItem('cookiesAccepted') === '1'; } catch (e) {}
+      if (!ok) { var b = document.getElementById('cookieBanner'); if (b) b.hidden = false; }
+    });
     // Triggers: keyboard shortcut and #admin
     document.addEventListener('keydown', function (e) {
       if (e.ctrlKey && e.shiftKey && (e.key === 'E' || e.key === 'e')) { e.preventDefault(); showAdminLogin(); }
