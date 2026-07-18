@@ -28,6 +28,7 @@ const PROVIDER_LABEL: Record<Provider, string> = {
   claude: '🤖 Claude',
   openai: '⚡ GPT-4o',
   gemini: '🎨 Gemini',
+  ollama: '💻 Local',
 };
 
 export default function ChatInterface({

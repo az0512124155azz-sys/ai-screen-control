@@ -151,6 +151,7 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
     };
 
     let text = match request.provider.as_str() {
+        "ollama" => ask_ollama(&request, image_b64.as_deref()).await?,
         "openai" => ask_openai(&request, image_b64.as_deref()).await?,
         "gemini" => ask_gemini(&request, image_b64.as_deref()).await?,
         _ => ask_claude(&request, image_b64.as_deref()).await?,
@@ -222,6 +223,40 @@ async fn ask_openai(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
         .as_str()
         .unwrap_or("No response")
         .to_string())
+}
+
+// Local, free AI via Ollama (http://localhost:11434). No API key needed.
+async fn ask_ollama(req: &AskRequest, image_b64: Option<&str>) -> Result<String, String> {
+    let mut message = serde_json::json!({ "role": "user", "content": req.question });
+    if let Some(b64) = image_b64 {
+        message["images"] = serde_json::json!([b64]);
+    }
+    let body = serde_json::json!({
+        "model": req.model,
+        "messages": [message],
+        "stream": false
+    });
+
+    let resp = reqwest::Client::new()
+        .post("http://localhost:11434/api/chat")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|_| {
+            "Can't reach the local AI. Install Ollama from ollama.com/download, run \
+             'ollama pull llama3.2-vision', and make sure Ollama is running."
+                .to_string()
+        })?;
+
+    let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    if let Some(err) = json.get("error") {
+        let msg = err.as_str().unwrap_or("Ollama error");
+        if msg.contains("not found") || msg.contains("try pulling") {
+            return Err("Model not installed. Open a terminal and run: ollama pull llama3.2-vision".to_string());
+        }
+        return Err(msg.to_string());
+    }
+    Ok(json["message"]["content"].as_str().unwrap_or("No response").to_string())
 }
 
 async fn ask_gemini(req: &AskRequest, image_b64: Option<&str>) -> Result<String, String> {

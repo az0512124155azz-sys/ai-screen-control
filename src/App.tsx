@@ -26,7 +26,9 @@ function loadConfig(): ProviderConfig {
   }
 }
 const keyFor = (c: ProviderConfig) =>
-  c.provider === 'openai' ? c.openaiKey : c.provider === 'gemini' ? c.geminiKey : c.claudeKey;
+  c.provider === 'ollama' ? '' :
+  c.provider === 'openai' ? c.openaiKey :
+  c.provider === 'gemini' ? c.geminiKey : c.claudeKey;
 const modelFor = (p: Provider) => PROVIDERS.find((x) => x.id === p)!.model;
 
 // Resize + reposition the always-on-top overlay window between the tiny bubble
@@ -97,7 +99,8 @@ export default function App() {
     const question = (text ?? input).trim();
     if (!question || loading) return;
     const apiKey = keyFor(config);
-    if (!apiKey) { setView('settings'); return; }
+    // Ollama runs locally and needs no key; the others require one.
+    if (config.provider !== 'ollama' && !apiKey) { setView('settings'); return; }
 
     addMessage('user', question);
     setInput('');

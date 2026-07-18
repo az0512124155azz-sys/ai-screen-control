@@ -229,3 +229,15 @@
   color: #fff;
 }
 .chip-icon { font-size: 16px; }
+
+/* Ollama (local AI) setup steps */
+.ollama-steps { margin: 10px 0 4px 18px; color: #334155; font-size: 14px; line-height: 1.7; }
+.ollama-steps li { margin-bottom: 8px; }
+.ollama-steps a { color: #667eea; font-weight: 600; text-decoration: none; }
+.ollama-steps a:hover { text-decoration: underline; }
+.ollama-steps code {
+  display: inline-block; margin-top: 4px;
+  background: #0f172a; color: #34d399;
+  padding: 4px 10px; border-radius: 6px;
+  font-family: 'Courier New', monospace; font-size: 13px;
+}

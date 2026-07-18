@@ -8,7 +8,7 @@ function openExternal(url: string) {
   invoke('open_url', { url }).catch(() => window.open(url, '_blank'));
 }
 
-export type Provider = 'claude' | 'openai' | 'gemini';
+export type Provider = 'claude' | 'openai' | 'gemini' | 'ollama';
 
 export interface ProviderConfig {
   provider: Provider;
@@ -24,6 +24,7 @@ interface SettingsPanelProps {
 }
 
 const PROVIDERS: { id: Provider; label: string; icon: string; keyPage: string; model: string }[] = [
+  { id: 'ollama', label: 'Local AI · Free', icon: '💻', keyPage: 'https://ollama.com/download', model: 'llama3.2-vision' },
   { id: 'claude', label: 'Claude', icon: '🤖', keyPage: 'https://console.anthropic.com/settings/keys', model: 'claude-3-5-sonnet-20241022' },
   { id: 'openai', label: 'OpenAI (GPT-4o)', icon: '⚡', keyPage: 'https://platform.openai.com/api-keys', model: 'gpt-4o' },
   { id: 'gemini', label: 'Gemini', icon: '🎨', keyPage: 'https://aistudio.google.com/app/apikey', model: 'gemini-2.0-flash' },
@@ -36,7 +37,7 @@ export default function SettingsPanel({ config, onSave, onClose }: SettingsPanel
   const set = (patch: Partial<ProviderConfig>) => setDraft((d) => ({ ...d, ...patch }));
   const toggle = (id: string) => setShow((s) => ({ ...s, [id]: !s[id] }));
 
-  const keyField = (id: Provider) => {
+  const keyField = (id: Exclude<Provider, 'ollama'>) => {
     const map = { claude: 'claudeKey', openai: 'openaiKey', gemini: 'geminiKey' } as const;
     return map[id];
   };
@@ -68,8 +69,25 @@ export default function SettingsPanel({ config, onSave, onClose }: SettingsPanel
           </div>
         </div>
 
-        {PROVIDERS.map((p) => {
-          const field = keyField(p.id);
+        {draft.provider === 'ollama' && (
+          <div className="setting-group">
+            <h3>💻 Local AI — Free (no key, no credit card)</h3>
+            <p className="info-text">Run a smart AI on your own computer. Free, private, works offline.</p>
+            <ol className="ollama-steps">
+              <li>Install Ollama (one click):
+                <a href="https://ollama.com/download" onClick={(e) => { e.preventDefault(); openExternal('https://ollama.com/download'); }}> ollama.com/download →</a>
+              </li>
+              <li>Open a terminal and download a vision model:
+                <code>ollama pull llama3.2-vision</code>
+              </li>
+              <li>Come back here and just start chatting — no key needed.</li>
+            </ol>
+            <p className="info-text">Needs a reasonably modern computer (8&nbsp;GB+ RAM). Less powerful than Claude/GPT, but completely free.</p>
+          </div>
+        )}
+
+        {PROVIDERS.filter((p) => p.id !== 'ollama').map((p) => {
+          const field = keyField(p.id as Exclude<Provider, 'ollama'>);
           return (
             <div className="setting-group" key={p.id}>
               <label htmlFor={`key-${p.id}`}>
@@ -98,9 +116,9 @@ export default function SettingsPanel({ config, onSave, onClose }: SettingsPanel
 
         <div className="setting-group">
           <h3>How it works</h3>
+          <p className="info-text">💻 <strong>Local AI</strong> is completely free — no key, no credit card. The paid APIs (Claude/GPT/Gemini) are smarter but now require billing.</p>
           <p className="info-text">📸 The app captures your screen automatically with every question — you never upload anything.</p>
-          <p className="info-text">🎥 For YouTube video analysis, use a <strong>Gemini</strong> key.</p>
-          <p className="info-text">🔀 Add several keys and switch between AIs anytime.</p>
+          <p className="info-text">🔀 Switch between AIs anytime.</p>
         </div>
       </div>
 
