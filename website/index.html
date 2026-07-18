@@ -329,15 +329,14 @@
       border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
     footer p { margin: 8px 0; font-size: 15px; opacity: 0.9; }
-    footer a { color: white; text-decoration: none; }
-    .footer-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
-    .footer-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-      padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px;
-      transition: all 0.2s ease;
-    }
-    .footer-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
+    footer a { color: rgba(255,255,255,0.75); text-decoration: none; }
+    .footer-cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; text-align: left; padding-bottom: 36px; border-bottom: 1px solid rgba(255,255,255,0.12); }
+    .footer-col h4 { color: #fbd24b; font-size: 15px; font-weight: 700; margin-bottom: 16px; letter-spacing: 0.3px; }
+    .footer-col a { display: block; padding: 6px 0; font-size: 14px; transition: color 0.2s ease, padding-left 0.2s ease; }
+    .footer-col a:hover { color: #fff; padding-left: 4px; }
+    .footer-bottom { padding-top: 24px; text-align: center; }
+    .footer-bottom p { opacity: 0.7; font-size: 14px; }
+    @media (max-width: 768px) { .footer-cols { grid-template-columns: 1fr 1fr; gap: 24px; } }
 
     /* ===== MODAL ===== */
     .modal-overlay {
@@ -502,6 +501,48 @@
       .nav-links { gap: 20px; font-size: 13px; }
       .modal-body { padding: 24px; }
     }
+
+    /* Technical support chat widget */
+    #supportWidget { position: fixed; right: 22px; bottom: 22px; z-index: 900; }
+    #supportBtn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--gradient); color: #fff; border: none;
+      padding: 14px 22px; border-radius: 999px; font-weight: 700; font-size: 15px;
+      cursor: pointer; box-shadow: 0 10px 28px rgba(102,126,234,0.45); font-family: inherit;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    #supportBtn:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(102,126,234,0.55); }
+    .sb-icon { font-size: 18px; }
+    .support-panel {
+      position: absolute; right: 0; bottom: 68px; width: 320px; max-width: 86vw;
+      background: #fff; border: 1px solid var(--border); border-radius: 18px;
+      box-shadow: 0 24px 60px rgba(15,23,42,0.28); overflow: hidden; animation: pop 0.3s ease;
+    }
+    .support-head {
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--gradient); color: #fff; padding: 16px 18px; font-weight: 700;
+    }
+    .support-head button { background: rgba(255,255,255,0.2); border: none; color: #fff; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; }
+    .support-body { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+    .support-greet { font-size: 14px; color: var(--text-light); line-height: 1.6; margin-bottom: 4px; }
+    .support-opt { display: block; text-align: center; padding: 12px; border-radius: 12px; font-weight: 700; font-size: 14px; text-decoration: none; transition: transform 0.15s ease; }
+    .support-opt:hover { transform: translateY(-2px); }
+    .support-opt.wa { background: #25D366; color: #fff; }
+    .support-opt.tg { background: #229ED9; color: #fff; }
+    .support-opt.em { background: var(--light); color: var(--primary); border: 1px solid var(--border); }
+    .support-hours { text-align: center; font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+    /* Admin edit bar */
+    #adminBar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 3000;
+      background: #0f172a; color: #fff; padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+      font-size: 14px; font-weight: 700; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    #adminBar button { background: var(--gradient); color: #fff; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    #adminBar button.exit { background: rgba(255,255,255,0.15); }
+    body.admin-editing { outline: 3px dashed rgba(102,126,234,0.4); outline-offset: -3px; }
+    body.admin-editing [contenteditable="true"]:hover { outline: 2px dashed var(--primary); outline-offset: 2px; cursor: text; background: rgba(102,126,234,0.05); }
+    body.admin-editing [contenteditable="true"]:focus { outline: 2px solid var(--primary); background: rgba(102,126,234,0.08); }
 
     /* Smooth scroll-reveal for cards/sections */
     .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1); will-change: opacity, transform; }
@@ -841,15 +882,57 @@
 
   <footer>
     <div class="container">
-      <div class="footer-buttons">
-        <a href="#accessibility" class="footer-btn">♿ Accessibility Statement</a>
-        <a href="#reviews" class="footer-btn">💬 Reviews &amp; Contact</a>
-        <a href="https://github.com/az0512124155azz-sys/ai-screen-control" target="_blank" rel="noopener" class="footer-btn">📂 GitHub</a>
+      <div class="footer-cols">
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="#features">Features</a>
+          <a href="#local-ai">Free Local AI</a>
+          <a href="#download">Download</a>
+          <a href="#docs">FAQ</a>
+        </div>
+        <div class="footer-col">
+          <h4>Support</h4>
+          <a href="#" onclick="openSupport();return false;">💬 Technical Support Chat</a>
+          <a href="#reviews">⭐ Reviews</a>
+          <a href="#" onclick="openSupport();return false;">Contact us</a>
+        </div>
+        <div class="footer-col">
+          <h4>Legal &amp; Info</h4>
+          <a href="#accessibility">♿ Accessibility Statement</a>
+          <a href="#docs">Terms of use</a>
+          <a href="#docs">Privacy</a>
+        </div>
+        <div class="footer-col">
+          <h4>Project</h4>
+          <a href="https://github.com/az0512124155azz-sys/ai-screen-control" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/az0512124155azz-sys/ai-screen-control/releases/latest" target="_blank" rel="noopener">Releases</a>
+        </div>
       </div>
-      <p><strong>AI Screen Control</strong> • © 2026 • All rights reserved</p>
-      <p>Made with ❤️ for creators, developers, and AI enthusiasts</p>
+      <div class="footer-bottom">
+        <p><strong>🤖 AI Screen Control</strong> · © 2026 · All rights reserved</p>
+      </div>
     </div>
   </footer>
+
+  <!-- ===== TECHNICAL SUPPORT CHAT (floating) ===== -->
+  <div id="supportWidget">
+    <button id="supportBtn" onclick="toggleSupport()" aria-label="Open technical support chat">
+      <span class="sb-icon">💬</span><span class="sb-text">Support</span>
+    </button>
+    <div id="supportPanel" class="support-panel" role="dialog" aria-label="Technical support" hidden>
+      <div class="support-head">
+        <span>👋 Technical Support</span>
+        <button onclick="toggleSupport()" aria-label="Close">✕</button>
+      </div>
+      <div class="support-body">
+        <p class="support-greet">Hi! How can we help? Chat with us and send screenshots, videos or files — we'll reply.</p>
+        <a class="support-opt wa" href="https://wa.me/000000000000" target="_blank" rel="noopener">💬 Chat on WhatsApp</a>
+        <a class="support-opt tg" href="https://t.me/your_username" target="_blank" rel="noopener">✈️ Chat on Telegram</a>
+        <a class="support-opt em" href="#reviews" onclick="toggleSupport()">📝 Send a message form</a>
+        <p class="support-hours">Typically replies within a few hours.</p>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== DOWNLOAD MODAL ===== -->
   <div class="modal-overlay" id="downloadModal">
@@ -1282,6 +1365,55 @@
       var body = encodeURIComponent(msg + note + '\n\n— ' + name);
       window.location.href = 'mailto:' + REVIEWS_EMAIL + '?subject=' + subject + '&body=' + body;
     }
+
+    // ---- Technical support chat widget ----
+    function toggleSupport() {
+      var p = document.getElementById('supportPanel');
+      p.hidden = !p.hidden;
+    }
+    function openSupport() {
+      var p = document.getElementById('supportPanel');
+      p.hidden = false;
+      document.getElementById('supportWidget').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ---- Secret admin edit area (no backend, no WordPress) ----
+    // Open the site and add  #admin  to the address, then enter the password.
+    // ▸ Change ADMIN_PASS to your own secret password.
+    var ADMIN_PASS = 'letmein';
+    function enterAdmin() {
+      var pass = prompt('🔒 Admin password:');
+      if (pass === null) return;
+      if (pass !== ADMIN_PASS) { alert('Wrong password.'); return; }
+      document.body.classList.add('admin-editing');
+      document.querySelectorAll('h1, h2, h3, h4, p, li, .hero-badge, .feature-card, .doc-card').forEach(function (el) {
+        if (el.closest('#adminBar') || el.closest('#supportWidget') || el.closest('.modal')) return;
+        el.setAttribute('contenteditable', 'true');
+      });
+      var bar = document.createElement('div');
+      bar.id = 'adminBar';
+      bar.innerHTML = '✏️ Edit mode — click any text and type to change it. ' +
+        '<button onclick="adminSave()">💾 Save &amp; download</button>' +
+        '<button class="exit" onclick="location.href=location.pathname">Exit</button>';
+      document.body.appendChild(bar);
+      document.body.style.paddingTop = '48px';
+    }
+    function adminSave() {
+      // Clean up the editing UI before exporting a pristine copy.
+      document.querySelectorAll('[contenteditable]').forEach(function (el) { el.removeAttribute('contenteditable'); });
+      var bar = document.getElementById('adminBar'); if (bar) bar.remove();
+      document.body.classList.remove('admin-editing');
+      document.body.style.paddingTop = '';
+      var html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'standalone.html';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 800);
+      alert('Saved! Upload the downloaded "standalone.html" to update your live site (or send it to me).');
+    }
+    if (location.hash === '#admin') { window.addEventListener('load', enterAdmin); }
 
     // Smooth scroll for nav
     document.querySelectorAll('a[href^="#"]').forEach(function (a) {
