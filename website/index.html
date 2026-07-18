@@ -620,6 +620,10 @@
   box-shadow: 0 12px 40px rgba(15,23,42,0.06); display: flex; flex-direction: column; gap: 12px;
 }
 .support-page-card .support-log { max-height: 340px; }
+#chatGate input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 15px; font-family: inherit; outline: none; margin-bottom: 10px; }
+#chatGate input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
+.gate-err { color: #ef4444; font-weight: 700; font-size: 13px; margin: 0 0 10px; }
+.chat-who { font-size: 12px; color: var(--text-light); background: var(--light); border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; display: inline-block; }
 .support-page-card .support-send { padding: 14px; font-size: 15px; }
 /* give reviews & accessibility sections a light page background when standalone */
 body > main > #reviews, body > main > #accessibility { background: var(--light); }
@@ -886,13 +890,24 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
   <section class="page-hero"><div class="container"><h1>💬 Technical Support</h1><p>Send us a message — attach a screenshot, video or file. We reply right here.</p></div></section>
   <section class="page-body"><div class="container narrow">
     <div class="support-page-card">
-      <div id="supportLog" class="support-log">
-        <div class="s-msg bot">Hi! 👋 How can we help? Send a message — you can attach a screenshot, video or file.</div>
+      <div id="chatGate">
+        <h3 style="margin-bottom:6px;">Start a support chat</h3>
+        <p style="color:var(--text-light); font-size:14px; margin-bottom:14px;">Enter your email and a password so your conversation is saved and we can reply to you.</p>
+        <input id="gateEmail" type="email" placeholder="Your email" autocomplete="email">
+        <input id="gatePass" type="password" placeholder="Choose a password" autocomplete="new-password">
+        <p id="gateErr" class="gate-err" hidden>Please enter a valid email and a password.</p>
+        <button class="support-send" onclick="startChat()">Start chat →</button>
       </div>
-      <textarea id="supportMsg" rows="3" placeholder="Type your message…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendSupport();}"></textarea>
-      <label class="support-file">📎 Attach files<input id="supportFile" type="file" accept="image/*,video/*,.pdf,.txt,.srt,.vtt" multiple hidden onchange="supportFilePicked()"></label>
-      <button class="support-send" onclick="sendSupport()">Send message</button>
-      <p class="support-hours">Live two-way replies activate once connected to a backend.</p>
+      <div id="chatArea" hidden>
+        <div class="chat-who" id="chatWho"></div>
+        <div id="supportLog" class="support-log">
+          <div class="s-msg bot">Hi! 👋 How can we help? Send a message — you can attach a screenshot, video or file.</div>
+        </div>
+        <textarea id="supportMsg" rows="3" placeholder="Type your message…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendSupport();}"></textarea>
+        <label class="support-file">📎 Attach files<input id="supportFile" type="file" accept="image/*,video/*,.pdf,.txt,.srt,.vtt" multiple hidden onchange="supportFilePicked()"></label>
+        <button class="support-send" onclick="sendSupport()">Send message</button>
+        <p class="support-hours">Live two-way replies activate once a backend is connected.</p>
+      </div>
     </div>
   </div></section>
   
@@ -1035,12 +1050,32 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
     } catch (e) { sb = null; }
     function backendOn() { return !!sb; }
 
-    // A stable id for this visitor's conversation.
+    // A stable id for this visitor's conversation — their email once signed in.
     function chatSession() {
+      var e = null; try { e = localStorage.getItem('chatEmail'); } catch (x) {}
+      if (e) return e;
       var s = null;
-      try { s = localStorage.getItem('chatSession'); } catch (e) {}
-      if (!s) { s = 'v-' + Math.random().toString(36).slice(2) + '-' + (new Date().getTime()); try { localStorage.setItem('chatSession', s); } catch (e) {} }
+      try { s = localStorage.getItem('chatSession'); } catch (x) {}
+      if (!s) { s = 'v-' + Math.random().toString(36).slice(2) + '-' + (new Date().getTime()); try { localStorage.setItem('chatSession', s); } catch (x) {} }
       return s;
+    }
+    // Chat sign-in gate: visitor enters email + password so the chat is saved.
+    function startChat() {
+      var email = (document.getElementById('gateEmail').value || '').trim();
+      var pass = document.getElementById('gatePass').value || '';
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !pass) { document.getElementById('gateErr').hidden = false; return; }
+      try { localStorage.setItem('chatEmail', email); localStorage.setItem('chatPass', pass); } catch (x) {}
+      refreshChatGate();
+    }
+    function refreshChatGate() {
+      var e = null; try { e = localStorage.getItem('chatEmail'); } catch (x) {}
+      var gate = document.getElementById('chatGate'), area = document.getElementById('chatArea');
+      if (!gate || !area) return;
+      if (e) {
+        gate.hidden = true; area.hidden = false;
+        var w = document.getElementById('chatWho'); if (w) w.textContent = 'Signed in as ' + e;
+        loadVisitorChat();
+      } else { gate.hidden = false; area.hidden = true; }
     }
 
     // OS display config
@@ -1703,7 +1738,7 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
       el.classList.add('active');
       el.querySelectorAll('.reveal').forEach(function (r) { r.classList.add('in'); });
       window.scrollTo(0, 0);
-      if (name === 'support') loadVisitorChat();
+      if (name === 'support') refreshChatGate();
       try { history.replaceState(null, '', name === 'home' ? './' : '#' + name); } catch (e) {}
     }
     function goHomeThen(hash) {
