@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Screen Control - Universal AI Assistant</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -50,11 +50,16 @@
     }
 
     html, body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
       color: var(--text);
       line-height: 1.6;
       background: white;
       scroll-behavior: smooth;
+    }
+    /* Friendly rounded display font for all headings + logo */
+    .logo, h1, h2, h3, .step-num, .localai-head h2 {
+      font-family: 'Fredoka', 'Nunito', sans-serif;
+      letter-spacing: 0;
     }
 
     .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
@@ -103,8 +108,14 @@
       font-weight: 800; letter-spacing: -1px;
     }
     .hero-content p { font-size: 20px; margin-bottom: 12px; opacity: 0.95; font-weight: 500; }
-    .subtitle { font-size: 18px; margin-bottom: 40px; opacity: 0.85; font-weight: 400; }
-    .hero-buttons { display: flex; gap: 20px; flex-wrap: wrap; }
+    .subtitle { font-size: 19px; margin-bottom: 36px; opacity: 0.92; font-weight: 400; }
+    .hero-buttons { display: flex; gap: 16px; flex-wrap: wrap; }
+    .hero-badge {
+      display: inline-block; margin-bottom: 22px; padding: 8px 16px;
+      background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 999px; font-weight: 700; font-size: 14px; backdrop-filter: blur(4px);
+    }
+    .btn { border-radius: 14px; }
 
     .btn {
       padding: 14px 36px; border-radius: 10px; text-decoration: none;
@@ -170,8 +181,22 @@
     .feature-card:hover::before { transform: scaleX(1); }
     .feature-icon { font-size: 56px; margin-bottom: 20px; transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
     .feature-card:hover .feature-icon { transform: scale(1.18) translateY(-2px); }
-    .feature-card h3 { margin-bottom: 12px; color: var(--text); font-size: 20px; font-weight: 700; }
+    .feature-card h3 { margin-bottom: 12px; color: var(--text); font-size: 21px; font-weight: 600; }
     .feature-card p { color: var(--text-light); font-size: 15px; line-height: 1.6; }
+    /* playful color-coded cards + rounded icon tiles */
+    .feature-card { border-radius: 24px; border: 1.5px solid transparent; }
+    .feature-icon {
+      width: 80px; height: 80px; border-radius: 24px; margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center; font-size: 40px;
+      box-shadow: 0 8px 18px rgba(15,23,42,0.08);
+    }
+    .feature-card:nth-child(6n+1) { background: #f2efff; } .feature-card:nth-child(6n+1) .feature-icon { background: #e0d8ff; }
+    .feature-card:nth-child(6n+2) { background: #e6faf3; } .feature-card:nth-child(6n+2) .feature-icon { background: #c9f2e4; }
+    .feature-card:nth-child(6n+3) { background: #fff2ea; } .feature-card:nth-child(6n+3) .feature-icon { background: #ffd9c4; }
+    .feature-card:nth-child(6n+4) { background: #eaf3ff; } .feature-card:nth-child(6n+4) .feature-icon { background: #cfe4ff; }
+    .feature-card:nth-child(6n+5) { background: #fdf0f6; } .feature-card:nth-child(6n+5) .feature-icon { background: #ffd3e6; }
+    .feature-card:nth-child(6n+6) { background: #fff7de; } .feature-card:nth-child(6n+6) .feature-icon { background: #ffe9a8; }
+    .feature-card::before { display: none; }
 
     /* Local AI (Ollama) spotlight */
     .localai { padding: 90px 0; background: white; }
@@ -481,12 +506,12 @@
   <header class="hero">
     <div class="container">
       <div class="hero-content">
-        <h1>Control Your Screen with AI</h1>
-        <p>Universal AI Assistant for Screen Control & Analysis — with a <strong>free local AI</strong> option</p>
-        <p class="subtitle">Talk to your screen. Take screenshots. Ask questions. Let AI help you work smarter.</p>
+        <span class="hero-badge">🆓 Free local AI · no credit card</span>
+        <h1>A little AI bubble that sees your screen</h1>
+        <p class="subtitle">Ask about anything on screen. It answers instantly — using free local AI, or your own Claude / GPT / Gemini key.</p>
         <div class="hero-buttons">
-          <a href="#download" class="btn btn-primary">📥 Download Now</a>
-          <a href="#docs" class="btn btn-secondary">Learn More →</a>
+          <a href="#download" class="btn btn-primary">📥 Get it free</a>
+          <a href="#local-ai" class="btn btn-secondary">How the free AI works →</a>
         </div>
       </div>
       <div class="hero-image">
@@ -503,43 +528,38 @@
 
   <section id="features" class="features">
     <div class="container">
-      <h2>Everything You Need</h2>
-      <p>Powerful features that work instantly</p>
+      <h2>What it does</h2>
+      <p>Six things, zero fuss.</p>
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon">💻</div>
-          <h3>Free Local AI — No Credit Card</h3>
-          <p>Run a smart AI on your own computer with <strong>Ollama</strong>. Completely free, private, works offline. No API key, no billing.</p>
+          <h3>Free local AI</h3>
+          <p>Runs on your computer. No key, no credit card, fully private.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">📸</div>
-          <h3>One-Click Screenshots</h3>
-          <p>Capture your screen instantly and ask AI anything about it. See results in seconds.</p>
+          <h3>Auto screenshots</h3>
+          <p>It grabs your screen by itself — you never upload anything.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🤖</div>
-          <h3>Multiple AIs at Once</h3>
-          <p>Local AI free, or bring your own Claude, GPT-4 and Gemini keys. Switch between them anytime.</p>
+          <h3>Any AI you like</h3>
+          <p>Free local AI, or your own Claude, GPT or Gemini key.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">⌨️</div>
-          <h3>Smart Screen Control</h3>
-          <p>Let AI click buttons, type text, and control your computer with natural language.</p>
+          <h3>Screen control</h3>
+          <p>Ask it to click, type and get things done for you.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🎥</div>
-          <h3>YouTube Video Analysis</h3>
-          <p>Paste a YouTube link and get summaries and insights. <strong>Requires a Gemini API key</strong> — only Gemini can read full video content.</p>
+          <h3>Video analysis</h3>
+          <p>Summarize YouTube videos <em>(with a Gemini key)</em>.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">💾</div>
-          <h3>Your Data, Your Control</h3>
-          <p>API keys stay local. No data sold. 100% privacy. You decide what gets shared.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">⚡</div>
-          <h3>Lightning Fast</h3>
-          <p>Instant screenshot. Real-time analysis. No waiting. Works offline where possible.</p>
+          <div class="feature-icon">🔒</div>
+          <h3>Private by default</h3>
+          <p>Your keys and data stay on your machine. Nothing sold.</p>
         </div>
       </div>
     </div>
@@ -993,19 +1013,74 @@
       return html;
     }
 
-    // Free-AI step: download Ollama for this OS, then how to run it.
+    // Free-AI step: a button that downloads Ollama AND opens a detailed guide.
     function ollamaStep(os) {
-      var url = { windows: 'https://ollama.com/download/windows', macos: 'https://ollama.com/download/mac', linux: 'https://ollama.com/download/linux' }[os];
-      var runNote = os === 'linux'
-        ? '<span>On Linux you can also install it with one command:</span>' + cmd('curl -fsSL https://ollama.com/install.sh | sh')
-        : '<span>After installing, Ollama runs quietly in the background (menu bar / system tray).</span>';
-      return '<li class="free-step"><strong>💻 Get the free AI — download Ollama</strong>' +
-        '<span>This is the free brain that runs on your computer. Download it for ' + OS_CONFIG[os].name + ':</span>' +
-        '<div class="link-row"><a class="link-chip primary-chip" href="' + url + '" target="_blank" rel="noopener">💻 Download Ollama for ' + OS_CONFIG[os].name + ' ↗</a></div>' +
-        runNote +
-        '<span>Then open a terminal and run this once to add a model that can see the screen:</span>' +
+      return '<li class="free-step"><strong>💻 Get the free AI (recommended)</strong>' +
+        '<span>Ollama is the free brain that runs on your computer — no key, no credit card. ' +
+        'Click below to download it and get full step-by-step instructions:</span>' +
+        '<div class="link-row"><button class="link-chip primary-chip" onclick="showOllamaGuide(\'' + os + '\')">' +
+        '💻 Download Ollama &amp; show me how →</button></div></li>';
+    }
+
+    var OLLAMA_URL = {
+      windows: 'https://ollama.com/download/windows',
+      macos: 'https://ollama.com/download/mac',
+      linux: 'https://ollama.com/download/linux'
+    };
+
+    // Detailed screen shown after the user chooses to set up Ollama:
+    // starts the download and explains how to run it and connect it to the app.
+    function showOllamaGuide(os) {
+      var name = OS_CONFIG[os].name;
+      var url = OLLAMA_URL[os];
+      // Start the download.
+      window.open(url, '_blank');
+
+      var runVerify = {
+        windows: 'Run the downloaded <strong>OllamaSetup.exe</strong> and click through the installer. When it finishes, Ollama starts automatically — you\'ll see its icon in the system tray (bottom-right).',
+        macos: 'Open the downloaded file and drag <strong>Ollama</strong> to Applications, then launch it once. You\'ll see the Ollama icon in the menu bar (top-right) — that means it\'s running.',
+        linux: 'Install with the one-line command below; it also starts the Ollama service automatically.'
+      }[os];
+
+      var steps = '<ol class="install-steps">';
+
+      // 1. Install
+      steps += '<li><strong>Install Ollama</strong><span>' + runVerify + '</span>' +
+        (os === 'linux' ? cmd('curl -fsSL https://ollama.com/install.sh | sh') : '') + '</li>';
+
+      // 2. Download the model
+      steps += '<li><strong>Download a model that can see the screen</strong>' +
+        '<span>Open a terminal (' + (os === 'windows' ? 'search “cmd” in Start' : 'Terminal') +
+        ') and run this once. It\'s a few GB, so give it a minute:</span>' +
         cmd('ollama pull llama3.2-vision') +
-        '<span>Back in the app: open Settings → pick <strong>Local AI · Free</strong> → start chatting. No key, no card.</span></li>';
+        '<span>When it finishes, the free AI is ready.</span></li>';
+
+      // 3. Connect to the app
+      steps += '<li><strong>Connect it to AI Screen Control</strong>' +
+        '<span>Open the app, click the ⚙️ Settings gear, choose <strong>💻 Local AI · Free</strong>, and press Save. ' +
+        'No API key needed — the app finds Ollama automatically.</span></li>';
+
+      // 4. Use it
+      steps += '<li><strong>Start using it — free</strong>' +
+        '<span>Tap the bubble, ask a question, and the local AI answers using your screen. Everything stays on your computer.</span></li>';
+
+      // Troubleshooting
+      steps += '<li><strong>If it says “can\'t reach the local AI”</strong>' +
+        '<span>Make sure Ollama is running (its icon should be visible), and that the model finished downloading. You can re-check by running:</span>' +
+        cmd('ollama list') +
+        '<span><code>llama3.2-vision</code> should appear in the list.</span></li>';
+
+      steps += '</ol>';
+
+      document.getElementById('modalTitle').textContent = '💻 Free AI setup — ' + name;
+      document.getElementById('modalBody').innerHTML =
+        '<button class="modal-back" onclick="chooseMethod(\'installer\')">← Back to install steps</button>' +
+        '<div class="download-banner"><div class="dl-icon">⬇️</div><div class="dl-text">' +
+        '<strong>Ollama is downloading…</strong><p>If it didn\'t start, use the button below.</p></div></div>' +
+        '<div class="link-row" style="margin-bottom:18px;"><a class="link-chip primary-chip" href="' + url +
+        '" target="_blank" rel="noopener">💻 Download Ollama for ' + name + ' again ↗</a></div>' +
+        steps;
+      document.getElementById('modalBody').scrollTop = 0;
     }
 
     // Build-from-source flow (for developers)
