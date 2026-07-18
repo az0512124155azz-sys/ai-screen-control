@@ -411,6 +411,14 @@
       color: var(--primary); font-weight: 600; font-size: 13px; transition: all 0.2s ease;
     }
     .link-chip:hover { border-color: var(--primary); background: #fff; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102,126,234,0.15); }
+    .primary-chip { background: var(--gradient) !important; color: #fff !important; border: none !important; padding: 11px 18px; }
+    .primary-chip:hover { color: #fff !important; box-shadow: 0 6px 16px rgba(102,126,234,0.35); }
+    .install-steps li.free-step {
+      background: linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.06));
+      border: 1px solid rgba(102,126,234,0.18); border-radius: 12px;
+      padding: 16px 16px 16px 52px; margin-bottom: 20px;
+    }
+    .install-steps li.free-step::after { display: none; }
 
     .provider-note {
       max-width: 760px; margin: 40px auto 0; text-align: center;
@@ -579,7 +587,7 @@
   <section id="download" class="download">
     <div class="container">
       <h2>Get Started Now</h2>
-      <p class="section-subtitle">Choose your device. Pick your installation method. Done in 1 minute.</p>
+      <p class="section-subtitle">Pick your device — you'll get the app <strong>and</strong> the free AI (Ollama), with simple steps. No credit card needed.</p>
 
       <div class="download-options">
         <div class="os-card">
@@ -966,21 +974,38 @@
 
       var html = '<ol class="install-steps">';
 
-      html += '<li><strong>Download the installer</strong>' +
-        '<span>Get the ' + fileName + ' for ' + OS_CONFIG[os].name + ' from the releases page:</span>' +
-        '<div class="link-row"><a class="link-chip" style="background:var(--gradient);color:#fff;border:none;" ' +
-          'href="' + RELEASES_URL + '" target="_blank" rel="noopener">📥 Download the installer ↗</a></div></li>';
+      html += '<li><strong>Download the app</strong>' +
+        '<span>Get the ' + fileName + ' for ' + OS_CONFIG[os].name + ':</span>' +
+        '<div class="link-row"><a class="link-chip primary-chip" ' +
+          'href="' + RELEASES_URL + '" target="_blank" rel="noopener">📥 Download the app ↗</a></div></li>';
 
       html += '<li><strong>Run the installer</strong>' + runStep + '</li>';
 
+      html += ollamaStep(os);
+
       html += screenControlStep(os);
 
-      html += '<li><strong>Add your API key</strong>' +
-        '<span>Open the app → Settings (gear) → paste your key → Save. Click a provider to get a key:</span>' +
+      html += '<li><strong>Prefer a smarter (paid) AI? Optional</strong>' +
+        '<span>Local AI is free. If you want Claude/GPT/Gemini instead, open Settings → paste a key (these now need billing):</span>' +
         apiKeyLinks() + '</li>';
 
       html += '</ol>';
       return html;
+    }
+
+    // Free-AI step: download Ollama for this OS, then how to run it.
+    function ollamaStep(os) {
+      var url = { windows: 'https://ollama.com/download/windows', macos: 'https://ollama.com/download/mac', linux: 'https://ollama.com/download/linux' }[os];
+      var runNote = os === 'linux'
+        ? '<span>On Linux you can also install it with one command:</span>' + cmd('curl -fsSL https://ollama.com/install.sh | sh')
+        : '<span>After installing, Ollama runs quietly in the background (menu bar / system tray).</span>';
+      return '<li class="free-step"><strong>💻 Get the free AI — download Ollama</strong>' +
+        '<span>This is the free brain that runs on your computer. Download it for ' + OS_CONFIG[os].name + ':</span>' +
+        '<div class="link-row"><a class="link-chip primary-chip" href="' + url + '" target="_blank" rel="noopener">💻 Download Ollama for ' + OS_CONFIG[os].name + ' ↗</a></div>' +
+        runNote +
+        '<span>Then open a terminal and run this once to add a model that can see the screen:</span>' +
+        cmd('ollama pull llama3.2-vision') +
+        '<span>Back in the app: open Settings → pick <strong>Local AI · Free</strong> → start chatting. No key, no card.</span></li>';
     }
 
     // Build-from-source flow (for developers)
