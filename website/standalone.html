@@ -525,12 +525,32 @@
     .support-head button { background: rgba(255,255,255,0.2); border: none; color: #fff; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; }
     .support-body { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
     .support-greet { font-size: 14px; color: var(--text-light); line-height: 1.6; margin-bottom: 4px; }
-    .support-opt { display: block; text-align: center; padding: 12px; border-radius: 12px; font-weight: 700; font-size: 14px; text-decoration: none; transition: transform 0.15s ease; }
-    .support-opt:hover { transform: translateY(-2px); }
-    .support-opt.wa { background: #25D366; color: #fff; }
-    .support-opt.tg { background: #229ED9; color: #fff; }
-    .support-opt.em { background: var(--light); color: var(--primary); border: 1px solid var(--border); }
-    .support-hours { text-align: center; font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .support-log { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+    .s-msg { padding: 9px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; max-width: 85%; }
+    .s-msg.bot { background: var(--light); color: var(--text); align-self: flex-start; border-bottom-left-radius: 4px; }
+    .s-msg.me { background: var(--gradient); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+    #supportMsg { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 14px; resize: none; outline: none; }
+    #supportMsg:focus { border-color: var(--primary); }
+    .support-file { font-size: 13px; color: var(--primary); font-weight: 700; cursor: pointer; display: inline-block; }
+    .support-send { background: var(--gradient); color: #fff; border: none; border-radius: 10px; padding: 11px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .support-hours { text-align: center; font-size: 11px; color: #94a3b8; margin: 0; }
+
+    /* Admin login overlay */
+    #adminLogin {
+      position: fixed; inset: 0; z-index: 3100; display: flex; align-items: center; justify-content: center;
+      background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); padding: 20px;
+    }
+    #adminLogin[hidden] { display: none; }
+    .admin-login-box { background: #fff; border-radius: 18px; padding: 30px; width: 340px; max-width: 90vw; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.35); }
+    .admin-login-box h3 { font-size: 20px; margin-bottom: 8px; }
+    .admin-login-box p { color: var(--text-light); font-size: 14px; margin-bottom: 16px; }
+    .admin-login-box input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 15px; outline: none; }
+    .admin-login-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
+    .admin-err { color: #ef4444 !important; font-weight: 700; margin: 10px 0 0 !important; }
+    .admin-login-actions { display: flex; gap: 10px; margin-top: 16px; }
+    .admin-login-actions button { flex: 1; padding: 11px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .admin-go { background: var(--gradient); color: #fff; }
+    .admin-cancel { background: var(--light); color: var(--text); }
 
     /* Admin edit bar */
     #adminBar {
@@ -914,6 +934,20 @@
     </div>
   </footer>
 
+  <!-- ===== ADMIN LOGIN (secret: Ctrl+Shift+E or #admin) ===== -->
+  <div id="adminLogin" hidden>
+    <form class="admin-login-box" onsubmit="tryAdmin(event)">
+      <h3>🔒 Admin login</h3>
+      <p>Enter your password to edit the site's text.</p>
+      <input id="adminPass" type="password" placeholder="Password" autocomplete="off">
+      <p id="adminErr" class="admin-err" hidden>Wrong password.</p>
+      <div class="admin-login-actions">
+        <button type="submit" class="admin-go">Enter</button>
+        <button type="button" class="admin-cancel" onclick="document.getElementById('adminLogin').hidden=true">Cancel</button>
+      </div>
+    </form>
+  </div>
+
   <!-- ===== TECHNICAL SUPPORT CHAT (floating) ===== -->
   <div id="supportWidget">
     <button id="supportBtn" onclick="toggleSupport()" aria-label="Open technical support chat">
@@ -925,11 +959,13 @@
         <button onclick="toggleSupport()" aria-label="Close">✕</button>
       </div>
       <div class="support-body">
-        <p class="support-greet">Hi! How can we help? Chat with us and send screenshots, videos or files — we'll reply.</p>
-        <a class="support-opt wa" href="https://wa.me/000000000000" target="_blank" rel="noopener">💬 Chat on WhatsApp</a>
-        <a class="support-opt tg" href="https://t.me/your_username" target="_blank" rel="noopener">✈️ Chat on Telegram</a>
-        <a class="support-opt em" href="#reviews" onclick="toggleSupport()">📝 Send a message form</a>
-        <p class="support-hours">Typically replies within a few hours.</p>
+        <div id="supportLog" class="support-log">
+          <div class="s-msg bot">Hi! 👋 How can we help? Send a message — you can attach a screenshot, video or file.</div>
+        </div>
+        <textarea id="supportMsg" rows="2" placeholder="Type your message…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendSupport();}"></textarea>
+        <label class="support-file">📎 Attach files<input id="supportFile" type="file" accept="image/*,video/*,.pdf,.txt,.srt,.vtt" multiple hidden onchange="supportFilePicked()"></label>
+        <button class="support-send" onclick="sendSupport()">Send</button>
+        <p class="support-hours">Live two-way replies activate once connected.</p>
       </div>
     </div>
   </div>
@@ -1366,38 +1402,78 @@
       window.location.href = 'mailto:' + REVIEWS_EMAIL + '?subject=' + subject + '&body=' + body;
     }
 
-    // ---- Technical support chat widget ----
+    // ---- Technical support chat widget (on-site chat box) ----
     function toggleSupport() {
       var p = document.getElementById('supportPanel');
       p.hidden = !p.hidden;
     }
     function openSupport() {
-      var p = document.getElementById('supportPanel');
-      p.hidden = false;
+      document.getElementById('supportPanel').hidden = false;
       document.getElementById('supportWidget').scrollIntoView({ behavior: 'smooth' });
+    }
+    function supportAddMsg(text, who) {
+      var log = document.getElementById('supportLog');
+      var d = document.createElement('div');
+      d.className = 's-msg ' + who;
+      d.textContent = text;
+      log.appendChild(d);
+      log.scrollTop = log.scrollHeight;
+    }
+    var supportFiles = [];
+    function supportFilePicked() {
+      var f = document.getElementById('supportFile').files;
+      supportFiles = f;
+      if (f && f.length) supportAddMsg('📎 ' + f.length + ' file(s) attached', 'me');
+    }
+    function sendSupport() {
+      var t = document.getElementById('supportMsg').value.trim();
+      if (!t) return;
+      supportAddMsg(t, 'me');
+      document.getElementById('supportMsg').value = '';
+      setTimeout(function () {
+        supportAddMsg('Thanks! Your message is noted. A team member will reply here shortly. 🙌', 'bot');
+      }, 500);
     }
 
     // ---- Secret admin edit area (no backend, no WordPress) ----
-    // Open the site and add  #admin  to the address, then enter the password.
+    // Open it with the secret shortcut  Ctrl + Shift + E  (or add #admin to the URL).
     // ▸ Change ADMIN_PASS to your own secret password.
     var ADMIN_PASS = 'letmein';
-    function enterAdmin() {
-      var pass = prompt('🔒 Admin password:');
-      if (pass === null) return;
-      if (pass !== ADMIN_PASS) { alert('Wrong password.'); return; }
+    function showAdminLogin() {
+      var box = document.getElementById('adminLogin');
+      box.hidden = false;
+      document.getElementById('adminErr').hidden = true;
+      var f = document.getElementById('adminPass'); f.value = '';
+      setTimeout(function () { f.focus(); }, 50);
+    }
+    function tryAdmin(e) {
+      if (e) e.preventDefault();
+      if (document.getElementById('adminPass').value !== ADMIN_PASS) {
+        document.getElementById('adminErr').hidden = false; return;
+      }
+      document.getElementById('adminLogin').hidden = true;
+      startEditing();
+    }
+    function startEditing() {
       document.body.classList.add('admin-editing');
       document.querySelectorAll('h1, h2, h3, h4, p, li, .hero-badge, .feature-card, .doc-card').forEach(function (el) {
-        if (el.closest('#adminBar') || el.closest('#supportWidget') || el.closest('.modal')) return;
+        if (el.closest('#adminBar') || el.closest('#supportWidget') || el.closest('.modal') || el.closest('#adminLogin')) return;
         el.setAttribute('contenteditable', 'true');
       });
       var bar = document.createElement('div');
       bar.id = 'adminBar';
       bar.innerHTML = '✏️ Edit mode — click any text and type to change it. ' +
         '<button onclick="adminSave()">💾 Save &amp; download</button>' +
-        '<button class="exit" onclick="location.href=location.pathname">Exit</button>';
+        '<button class="exit" onclick="location.reload()">Exit</button>';
       document.body.appendChild(bar);
       document.body.style.paddingTop = '48px';
     }
+    // Triggers: keyboard shortcut and #admin
+    document.addEventListener('keydown', function (e) {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'E' || e.key === 'e')) { e.preventDefault(); showAdminLogin(); }
+    });
+    window.addEventListener('load', function () { if (location.hash === '#admin') showAdminLogin(); });
+    window.addEventListener('hashchange', function () { if (location.hash === '#admin') showAdminLogin(); });
     function adminSave() {
       // Clean up the editing UI before exporting a pristine copy.
       document.querySelectorAll('[contenteditable]').forEach(function (el) { el.removeAttribute('contenteditable'); });
@@ -1413,7 +1489,6 @@
       setTimeout(function () { URL.revokeObjectURL(url); }, 800);
       alert('Saved! Upload the downloaded "standalone.html" to update your live site (or send it to me).');
     }
-    if (location.hash === '#admin') { window.addEventListener('load', enterAdmin); }
 
     // Smooth scroll for nav
     document.querySelectorAll('a[href^="#"]').forEach(function (a) {
