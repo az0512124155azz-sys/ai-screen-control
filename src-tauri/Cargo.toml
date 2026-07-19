@@ -1,6 +1,6 @@
 [package]
 name = "ai-screen-control"
-version = "0.1.14"
+version = "0.1.15"
 description = "AI Screen Control - Universal AI Assistant"
 authors = ["AI Screen Control"]
 edition = "2021"
@@ -16,6 +16,8 @@ tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+imageproc = { version = "0.25", default-features = false }
+ab_glyph = "0.2"
 
 [profile.release]
 panic = "abort"
