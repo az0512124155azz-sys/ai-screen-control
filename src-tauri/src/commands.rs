@@ -7,6 +7,22 @@ use std::process::Command;
 // Bold TTF bundled at build time, used to label the coordinate grid.
 const GRID_FONT: &[u8] = include_bytes!("../assets/grid-font.ttf");
 
+// Build a Command that never flashes a console window on Windows. Without the
+// CREATE_NO_WINDOW flag, every PowerShell/cmd helper pops a black terminal on
+// screen — which the AI then sees in its screenshot and tries to "close".
+fn new_command(program: &str) -> Command {
+    let cmd = Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut cmd = cmd;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        return cmd;
+    }
+    #[allow(unreachable_code)]
+    cmd
+}
+
 // ---------- Screen capture ----------
 
 // Capture the whole screen to a PNG and return the raw bytes.
@@ -60,7 +76,7 @@ fn capture_screen_png() -> Result<Vec<u8>, String> {
              $bmp.Save('{}'); $g.Dispose(); $bmp.Dispose()",
             path_str.replace('\\', "\\\\")
         );
-        let ok = Command::new("powershell")
+        let ok = new_command("powershell")
             .args(["-NoProfile", "-Command", &ps])
             .status()
             .map(|s| s.success())
@@ -265,16 +281,9 @@ Rules:\n\
 // grabs the screen itself and sends it along — the user never uploads anything.
 // Action tags in the model's reply are then executed for real.
 #[tauri::command]
-pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
+pub async fn ask(window: tauri::WebviewWindow, request: AskRequest) -> Result<AIResponse, String> {
     let image_b64 = if request.capture_screen {
-        match capture_screen_jpeg_grid() {
-            Ok(bytes) => Some(STANDARD.encode(bytes)),
-            Err(e) => {
-                // Don't fail the whole request if capture fails; answer text-only.
-                eprintln!("screen capture warning: {e}");
-                None
-            }
-        }
+        grab_screen_hidden(&window).await.map(|b| STANDARD.encode(b))
     } else {
         None
     };
@@ -342,7 +351,7 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
 
         // Give the UI a moment (pages/apps to react), then look again.
         tokio::time::sleep(std::time::Duration::from_millis(700)).await;
-        let shot = capture_screen_jpeg_grid().ok().map(|b| STANDARD.encode(b));
+        let shot = grab_screen_hidden(&window).await.map(|b| STANDARD.encode(b));
 
         let follow = AskRequest {
             question: format!(
@@ -397,6 +406,17 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
 }
 
 // Route to the selected provider.
+// Capture the screen with the app's OWN window hidden, so its chat panel never
+// covers the content the AI is trying to read (and the AI never sees itself).
+async fn grab_screen_hidden(window: &tauri::WebviewWindow) -> Option<Vec<u8>> {
+    let _ = window.hide();
+    // Let the compositor actually remove the window before the screenshot.
+    tokio::time::sleep(std::time::Duration::from_millis(180)).await;
+    let shot = capture_screen_jpeg_grid().ok();
+    let _ = window.show();
+    shot
+}
+
 async fn ask_provider(request: &AskRequest, image_b64: Option<&str>) -> Result<String, String> {
     match request.provider.as_str() {
         "ollama" => ask_ollama(request, image_b64).await,
@@ -573,7 +593,7 @@ fn do_type(text: &str) -> Result<(), String> {
         let b64 = STANDARD.encode(text.as_bytes());
         let script = r#"Add-Type -AssemblyName System.Windows.Forms; $t=[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('__B64__')); foreach($ch in $t.ToCharArray()){ $s=$ch.ToString(); if('+^%~(){}[]'.Contains($s)){$s='{'+$s+'}'}; [System.Windows.Forms.SendKeys]::SendWait($s); Start-Sleep -Milliseconds 55 }"#;
         let ps = script.replace("__B64__", &b64);
-        return Command::new("powershell")
+        return new_command("powershell")
             .args(["-NoProfile", "-Command", &ps])
             .status()
             .map_err(|e| e.to_string())
@@ -641,7 +661,7 @@ fn do_key(combo: &str) -> Result<(), String> {
         let ps = format!(
             "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{mods}{key}')"
         );
-        return Command::new("powershell")
+        return new_command("powershell")
             .args(["-NoProfile", "-Command", &ps])
             .status()
             .map_err(|e| e.to_string())
@@ -728,7 +748,7 @@ fn do_click(x: i32, y: i32) -> Result<(), String> {
              Start-Sleep -Milliseconds 60; \
              [W.U32]::mouse_event(2, 0, 0, 0, 0); [W.U32]::mouse_event(4, 0, 0, 0, 0)"
         );
-        return Command::new("powershell")
+        return new_command("powershell")
             .args(["-NoProfile", "-Command", &ps])
             .status()
             .map_err(|e| e.to_string())
@@ -1029,7 +1049,7 @@ async fn ask_gemini(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
 #[tauri::command]
 pub async fn open_url(url: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
-    let res = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+    let res = new_command("cmd").args(["/C", "start", "", &url]).spawn();
     #[cfg(target_os = "macos")]
     let res = Command::new("open").arg(&url).spawn();
     #[cfg(target_os = "linux")]
@@ -1044,7 +1064,7 @@ pub async fn open_url(url: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn run_command(command: String) -> Result<String, String> {
     let output = if cfg!(target_os = "windows") {
-        Command::new("cmd").args(["/C", &command]).output()
+        new_command("cmd").args(["/C", &command]).output()
     } else {
         Command::new("sh").args(["-c", &command]).output()
     }
