@@ -261,6 +261,7 @@ When the user asks you to do something on their computer (open a website, search
 Available actions:\n\
 - OPEN_URL: opens a real, full URL in the browser (must start with http). Use it only for a site's HOMEPAGE or a URL you are 100% sure exists. NEVER invent a search URL — that opens dead pages.\n\
 - SEARCH: the RIGHT way to search. Format [[SEARCH|site|query]] — e.g. [[SEARCH|amazon|galaxy tab s11 ultra]], [[SEARCH|youtube|lofi music]], [[SEARCH|ksp|iphone 16]]. The app builds the correct search URL itself, so you never guess it. If the user says 'search HERE' / 'search on this site', use the site currently open (from the screenshot / conversation). If no specific site, use [[SEARCH|google|query]].\n\
+- ONE search, ONE method: to search for something, use EXACTLY ONE action — either [[SEARCH|...]] OR typing in the box (TYPEAT+KEY enter), NEVER both, and never also OPEN_URL for the same query. Never repeat a search you already did — it just opens duplicate tabs.\n\
 - TYPEAT: the RELIABLE way to type into a field with the keyboard. Format [[TYPEAT|x,y|text]] — it clicks the field at x,y (read x,y off the pink grid) so the keyboard goes to the RIGHT place, then types the text. Use this to fill a site's own search box, a login form, any input. Follow with [[KEY|enter]] to submit.\n\
 - TYPE: types text at wherever the cursor currently is (use only right after a CLICK/TYPEAT that already focused the field).\n\
 - KEY: presses a key or combo: enter, tab, esc, backspace, delete, up, down, left, right, home, end, or combos like ctrl+l, ctrl+a, ctrl+c, alt+tab.\n\
@@ -334,12 +335,17 @@ pub async fn ask(window: tauri::WebviewWindow, request: AskRequest) -> Result<AI
     loop {
         // Run this step's actions.
         let mut ran_any = false;
+        // Anything that opens a browser tab (OPEN_URL / SEARCH) is de-duplicated
+        // across the whole run so the model can't spam dozens of identical tabs.
         for (cmd, arg) in actions.iter().take(12) {
             if cmd == "DONE" {
                 continue;
             }
-            if cmd == "OPEN_URL" && !opened_urls.insert(arg.clone()) {
-                continue; // this exact site is already open — don't reopen it
+            if cmd == "OPEN_URL" || cmd == "SEARCH" {
+                let key = format!("{cmd}|{}", arg.trim().to_lowercase());
+                if !opened_urls.insert(key) {
+                    continue; // same URL / same search already done — skip
+                }
             }
             ran_any = true;
             match execute_action(cmd, arg).await {
