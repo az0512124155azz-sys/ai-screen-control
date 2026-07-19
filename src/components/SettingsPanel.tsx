@@ -24,7 +24,7 @@ interface SettingsPanelProps {
 }
 
 const PROVIDERS: { id: Provider; label: string; icon: string; keyPage: string; model: string }[] = [
-  { id: 'ollama', label: 'Local AI · Free', icon: '💻', keyPage: 'https://ollama.com/download', model: 'llama3.2-vision' },
+  { id: 'ollama', label: 'Local AI · Free', icon: '💻', keyPage: 'https://ollama.com/download', model: 'gemma3' },
   { id: 'claude', label: 'Claude', icon: '🤖', keyPage: 'https://console.anthropic.com/settings/keys', model: 'claude-3-5-sonnet-20241022' },
   { id: 'openai', label: 'OpenAI (GPT-4o)', icon: '⚡', keyPage: 'https://platform.openai.com/api-keys', model: 'gpt-4o' },
   { id: 'gemini', label: 'Gemini', icon: '🎨', keyPage: 'https://aistudio.google.com/app/apikey', model: 'gemini-2.0-flash' },
@@ -78,7 +78,7 @@ export default function SettingsPanel({ config, onSave, onClose }: SettingsPanel
                 <a href="https://ollama.com/download" onClick={(e) => { e.preventDefault(); openExternal('https://ollama.com/download'); }}> ollama.com/download →</a>
               </li>
               <li>Open a terminal and download a vision model:
-                <code>ollama pull llama3.2-vision</code>
+                <code>ollama pull gemma3</code>
               </li>
               <li>Come back here and just start chatting — no key needed.</li>
             </ol>

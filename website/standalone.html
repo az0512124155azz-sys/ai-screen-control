@@ -728,15 +728,17 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
         <div class="localai-steps">
           <div class="localai-step">
             <span class="step-num">1</span>
-            <h4>Install Ollama</h4>
-            <p>One-click download for Windows, macOS & Linux.</p>
+            <h4>Install the latest Ollama</h4>
+            <p>One-click download for Windows, macOS &amp; Linux. Already have it? Run the installer again to update.</p>
             <a class="localai-link" href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download ↗</a>
           </div>
           <div class="localai-step">
             <span class="step-num">2</span>
             <h4>Download a vision model</h4>
-            <p>Open a terminal and run this once:</p>
-            <code>ollama pull llama3.2-vision</code>
+            <p>Open a terminal and run this once (newest model):</p>
+            <code>ollama pull gemma3</code>
+            <p style="margin-top:8px;">Older / weaker computer? Use:</p>
+            <code>ollama pull llava</code>
           </div>
           <div class="localai-step">
             <span class="step-num">3</span>
@@ -1242,7 +1244,7 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
       steps += '<li><strong>Download a model that can see the screen</strong>' +
         '<span>Open a terminal (' + (os === 'windows' ? 'search “cmd” in Start' : 'Terminal') +
         ') and run this once. It\'s a few GB, so give it a minute:</span>' +
-        cmd('ollama pull llama3.2-vision') +
+        cmd('ollama pull gemma3') +
         '<span>When it finishes, the free AI is ready.</span></li>';
 
       // 3. Connect to the app
@@ -1258,7 +1260,9 @@ body > main > #reviews, body > main > #accessibility { background: var(--light);
       steps += '<li><strong>If it says “can\'t reach the local AI”</strong>' +
         '<span>Make sure Ollama is running (its icon should be visible), and that the model finished downloading. You can re-check by running:</span>' +
         cmd('ollama list') +
-        '<span><code>llama3.2-vision</code> should appear in the list.</span></li>';
+        '<span><code>gemma3</code> should appear in the list.</span></li>' +
+        '<li><strong>If it says \u201cunknown model architecture\u201d</strong>' +
+        '<span>That model can\'t run on your Ollama. Run <code>ollama pull gemma3</code> \u2014 the app picks it up automatically. If you installed llama3.2-vision, remove it with <code>ollama rm llama3.2-vision</code>.</span></li>';
 
       steps += '</ol>';
 

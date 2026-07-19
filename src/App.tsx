@@ -61,9 +61,24 @@ export default function App() {
   const [useScreen, setUseScreen] = useState<boolean>(
     localStorage.getItem('use_screen') !== 'false'
   );
+  const [ollamaUp, setOllamaUp] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { localStorage.setItem('use_screen', String(useScreen)); }, [useScreen]);
+
+  // Live connection check — polls Ollama every 5s so the badge turns green
+  // within seconds of it starting up.
+  useEffect(() => {
+    let alive = true;
+    const check = () => {
+      invoke<{ connected: boolean }>('ollama_status')
+        .then((s) => { if (alive) setOllamaUp(s.connected); })
+        .catch(() => { if (alive) setOllamaUp(false); });
+    };
+    check();
+    const id = setInterval(check, 5000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
 
   // Start collapsed as a small bubble in the bottom-right of the desktop.
   useEffect(() => { setWindow(false); }, []);
@@ -153,6 +168,7 @@ export default function App() {
         loading={loading}
         inputRef={inputRef}
         provider={config.provider}
+        connected={config.provider === 'ollama' ? ollamaUp : !!keyFor(config)}
         openSettings={() => setView('settings')}
         onMinimize={minimize}
         useScreen={useScreen}

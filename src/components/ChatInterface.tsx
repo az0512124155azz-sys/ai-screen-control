@@ -18,6 +18,7 @@ interface ChatInterfaceProps {
   loading: boolean;
   inputRef: React.RefObject<HTMLInputElement>;
   provider: Provider;
+  connected: boolean;
   openSettings: () => void;
   onMinimize: () => void;
   useScreen: boolean;
@@ -39,6 +40,7 @@ export default function ChatInterface({
   loading,
   inputRef,
   provider,
+  connected,
   openSettings,
   onMinimize,
   useScreen,
@@ -65,7 +67,18 @@ export default function ChatInterface({
           <span>AI Screen Control</span>
         </div>
         <div className="header-actions">
-          <button className="provider-badge" onClick={openSettings} title="Change AI / settings">
+          <button
+            className="provider-badge"
+            onClick={openSettings}
+            title={
+              connected
+                ? (provider === 'ollama' ? 'Connected to Ollama (local AI)' : 'API key set — ready')
+                : (provider === 'ollama'
+                    ? 'Ollama is not running — open it (or install from ollama.com)'
+                    : 'No API key — click to add one in Settings')
+            }
+          >
+            <span className={`conn-dot ${connected ? 'on' : 'off'}`} aria-hidden="true" />
             {PROVIDER_LABEL[provider]}
             <Settings size={15} />
           </button>

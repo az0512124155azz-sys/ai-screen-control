@@ -225,14 +225,101 @@ async fn ask_openai(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
         .to_string())
 }
 
-// Local, free AI via Ollama (http://localhost:11434). No API key needed.
+// ---------- Local, free AI via Ollama (http://localhost:11434) ----------
+
+// Vision-capable models in preference order. llama3.2-vision (mllama) is
+// deliberately absent — its architecture fails to load on many Ollama builds.
+const OLLAMA_PREFS: [&str; 6] = ["gemma3", "llava", "moondream", "qwen3-vl", "qwen2.5vl", "minicpm-v"];
+
+async fn ollama_installed_models() -> Vec<String> {
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    let Ok(resp) = client.get("http://localhost:11434/api/tags").send().await else {
+        return Vec::new();
+    };
+    let Ok(json) = resp.json::<serde_json::Value>().await else {
+        return Vec::new();
+    };
+    json["models"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|m| m["name"].as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+// Choose a model that is actually installed and runnable, so the user never
+// hits "model not found" or the mllama architecture crash.
+async fn pick_ollama_model(requested: &str) -> String {
+    let models = ollama_installed_models().await;
+    let usable: Vec<&String> = models
+        .iter()
+        .filter(|m| !m.contains("llama3.2-vision"))
+        .collect();
+    if !requested.contains("llama3.2-vision")
+        && usable.iter().any(|m| m.as_str() == requested || m.starts_with(&format!("{requested}:")))
+    {
+        return requested.to_string();
+    }
+    for pref in OLLAMA_PREFS {
+        if let Some(hit) = usable.iter().find(|m| m.contains(pref)) {
+            return hit.to_string();
+        }
+    }
+    usable
+        .first()
+        .map(|m| m.to_string())
+        .unwrap_or_else(|| requested.to_string())
+}
+
+#[derive(Serialize)]
+pub struct OllamaStatus {
+    pub connected: bool,
+    pub models: Vec<String>,
+}
+
+// Lightweight liveness check — the UI polls this to show the connection badge.
+#[tauri::command]
+pub async fn ollama_status() -> Result<OllamaStatus, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(|e| e.to_string())?;
+    match client.get("http://localhost:11434/api/tags").send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let models = resp
+                .json::<serde_json::Value>()
+                .await
+                .ok()
+                .and_then(|j| {
+                    j["models"].as_array().map(|a| {
+                        a.iter()
+                            .filter_map(|m| m["name"].as_str().map(String::from))
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .unwrap_or_default();
+            Ok(OllamaStatus { connected: true, models })
+        }
+        _ => Ok(OllamaStatus { connected: false, models: Vec::new() }),
+    }
+}
+
 async fn ask_ollama(req: &AskRequest, image_b64: Option<&str>) -> Result<String, String> {
+    let model = pick_ollama_model(&req.model).await;
     let mut message = serde_json::json!({ "role": "user", "content": req.question });
     if let Some(b64) = image_b64 {
         message["images"] = serde_json::json!([b64]);
     }
     let body = serde_json::json!({
-        "model": req.model,
+        "model": model,
         "messages": [message],
         "stream": false
     });
@@ -244,7 +331,7 @@ async fn ask_ollama(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
         .await
         .map_err(|_| {
             "Can't reach the local AI. Install Ollama from ollama.com/download, run \
-             'ollama pull llama3.2-vision', and make sure Ollama is running."
+             'ollama pull gemma3', and make sure Ollama is running."
                 .to_string()
         })?;
 
@@ -252,7 +339,14 @@ async fn ask_ollama(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
     if let Some(err) = json.get("error") {
         let msg = err.as_str().unwrap_or("Ollama error");
         if msg.contains("not found") || msg.contains("try pulling") {
-            return Err("Model not installed. Open a terminal and run: ollama pull llama3.2-vision".to_string());
+            return Err("Model not installed. Open a terminal and run: ollama pull gemma3".to_string());
+        }
+        if msg.contains("unknown model architecture") {
+            return Err(format!(
+                "Your Ollama can't run the model '{model}'. Open a terminal and run: ollama pull gemma3 \
+                 — the app will use it automatically. (If you installed llama3.2-vision, you can remove \
+                 it with: ollama rm llama3.2-vision)"
+            ));
         }
         return Err(msg.to_string());
     }
