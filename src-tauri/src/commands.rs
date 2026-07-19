@@ -242,7 +242,8 @@ When the user asks you to do something on their computer (open a website, search
 [[CLICK|x,y]]\n\
 [[WAIT|1500]]\n\
 Available actions:\n\
-- OPEN_URL: opens a URL in the default browser. PREFER THIS for anything web related. To search, open the results URL directly, e.g. https://www.google.com/search?q=galaxy+tab+s11+ultra (URL-encode the query). For a specific store like ksp.co.il use https://ksp.co.il/web/cat?find=QUERY or a Google search of 'site + product'.\n\
+- OPEN_URL: opens a real, full URL in the browser (must start with http). Use it only for a site's HOMEPAGE or a URL you are 100% sure exists. NEVER invent a search URL — that opens dead pages.\n\
+- SEARCH: the RIGHT way to search. Format [[SEARCH|site|query]] — e.g. [[SEARCH|amazon|galaxy tab s11 ultra]], [[SEARCH|youtube|lofi music]], [[SEARCH|ksp|iphone 16]]. The app builds the correct search URL itself, so you never guess it. If the user says 'search HERE' / 'search on this site', use the site currently open (from the screenshot / conversation). If no specific site, use [[SEARCH|google|query]].\n\
 - TYPE: types text at the current cursor position.\n\
 - KEY: presses a key or combo: enter, tab, esc, backspace, delete, up, down, left, right, home, end, or combos like ctrl+l, ctrl+c, alt+tab.\n\
 - CLICK: clicks at screen pixel coordinates x,y. The screenshot has a PINK COORDINATE GRID drawn on it: numbers along the TOP are x (horizontal) pixels, numbers down the LEFT are y (vertical) pixels. READ the target's position off this grid — find the nearest labelled lines and interpolate between them — then give those exact numbers. Do NOT guess without using the grid.\n\
@@ -280,7 +281,7 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
     // screen — small local models otherwise tend to just narrate what they see.
     let first_req = AskRequest {
         question: format!(
-            "{}The user's new command: \"{}\"\nCarry it out using action tags. Use the conversation context above: if the command refers to a site already open (e.g. \"search there\"), act inside THAT site — for a search, type into that site's own search box (CLICK it, TYPE the query, [[KEY|enter]]) or open its search URL, not Google. Do the task — don't just describe what's on screen.",
+            "{}The user's new command: \"{}\"\nCarry it out using action tags. Use the conversation context above: if the command refers to a site already open (e.g. \"search there\"), search INSIDE that site with [[SEARCH|site|query]] using that site's name — never invent a search URL. Do the task — don't just describe what's on screen.",
             history_preamble(&request.history),
             request.question
         ),
@@ -434,6 +435,54 @@ fn extract_actions(raw: &str) -> (String, Vec<(String, String)>) {
     (text.trim().to_string(), actions)
 }
 
+// Percent-encode a query string for use in a URL.
+fn url_encode(s: &str) -> String {
+    let mut out = String::new();
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b' ' => out.push('+'),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+// Build a CORRECT search URL for a site from a small template table. The model
+// only supplies the site name + query; it never invents the URL scheme (which
+// is what made it open non-existent pages). Unknown sites fall back to a Google
+// site-scoped search, which is always a valid URL.
+fn build_search_url(site: &str, query: &str) -> String {
+    let q = url_encode(query);
+    let s = site.to_lowercase();
+    let s = s.trim_start_matches("www.");
+    // Match by a keyword contained in the site name/domain.
+    let contains = |k: &str| s.contains(k);
+
+    // Only sites whose search URL is known-correct get a direct template.
+    // Everything else uses a Google site-scoped search, which is ALWAYS a valid
+    // URL and never lands on a dead page — the whole point of this action.
+    if contains("amazon") {
+        let domain = if s.contains('.') { s.to_string() } else { "amazon.com".to_string() };
+        format!("https://www.{domain}/s?k={q}")
+    } else if contains("youtube") {
+        format!("https://www.youtube.com/results?search_query={q}")
+    } else if contains("ebay") {
+        format!("https://www.ebay.com/sch/i.html?_nkw={q}")
+    } else if contains("wikipedia") {
+        format!("https://en.wikipedia.org/w/index.php?search={q}")
+    } else if contains("google") || s.is_empty() {
+        format!("https://www.google.com/search?q={q}")
+    } else if s.contains('.') {
+        // A real domain was given (ksp.co.il, wolt.com …) → Google within it.
+        format!("https://www.google.com/search?q=site%3A{s}+{q}")
+    } else {
+        // A bare site name (ksp, wolt …) → plain Google search including the
+        // name as a keyword. Always valid, and the site's own results rank high.
+        format!("https://www.google.com/search?q={}+{q}", url_encode(&s))
+    }
+}
+
 fn ok_status(status: std::process::ExitStatus) -> Result<(), String> {
     if status.success() {
         Ok(())
@@ -476,6 +525,18 @@ async fn execute_action(cmd: &str, arg: &str) -> Result<String, String> {
             let up = arg.to_lowercase().contains("up");
             do_scroll(up)?;
             Ok(format!("Scrolled {}", if up { "up" } else { "down" }))
+        }
+        "SEARCH" => {
+            // arg is "site|query" (or just "query"). WE build the correct search
+            // URL from a template — the model must NOT invent search URLs, which
+            // is what caused it to open non-existent pages.
+            let (site, query) = match arg.split_once('|') {
+                Some((s, q)) => (s.trim(), q.trim()),
+                None => ("", arg.trim()),
+            };
+            let url = build_search_url(site, query);
+            open_url(url.clone()).await?;
+            Ok(format!("Searched \"{query}\"{}", if site.is_empty() { String::new() } else { format!(" on {site}") }))
         }
         other => Err(format!("unknown action '{other}'")),
     }
