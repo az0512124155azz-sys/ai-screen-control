@@ -248,8 +248,20 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
         None
     };
 
-    // First turn: use the screenshot we already captured (if any).
-    let first = ask_provider(&request, image_b64.as_deref()).await?;
+    // First turn: use the screenshot we already captured (if any). Frame the
+    // request so the model performs the command rather than describing the
+    // screen — small local models otherwise tend to just narrate what they see.
+    let first_req = AskRequest {
+        question: format!(
+            "The user's command: \"{}\"\nCarry it out using action tags. If it is a web/search task, open the right URL directly with OPEN_URL. Do the task — don't just describe what's on screen.",
+            request.question
+        ),
+        provider: request.provider.clone(),
+        api_key: request.api_key.clone(),
+        model: request.model.clone(),
+        capture_screen: request.capture_screen,
+    };
+    let first = ask_provider(&first_req, image_b64.as_deref()).await?;
     let (clean_text, mut actions) = extract_actions(&first);
 
     let mut transcript = clean_text.clone();
@@ -261,15 +273,24 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
     // Only loops when we can see the screen (screen capture on) and there is
     // more to do; bounded so it always terminates.
     let mut action_log: Vec<String> = Vec::new();
+    // Remember every action already performed so a repetitive model can't make
+    // us do the same thing (e.g. re-open the same URL) over and over.
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut step = 0;
-    const MAX_STEPS: usize = 6;
+    const MAX_STEPS: usize = 4;
 
     loop {
-        // Run this step's actions.
+        // Run this step's actions, skipping any we've already performed.
+        let mut ran_new = false;
         for (cmd, arg) in actions.iter().take(12) {
             if cmd == "DONE" {
                 continue;
             }
+            let key = format!("{cmd}|{arg}");
+            if !seen.insert(key) {
+                continue; // already did exactly this — don't repeat it
+            }
+            ran_new = true;
             match execute_action(cmd, arg).await {
                 Ok(note) => action_log.push(format!("✅ {note}")),
                 Err(e) => action_log.push(format!("⚠️ {cmd} failed: {e}")),
@@ -277,7 +298,9 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
         }
 
         step += 1;
-        if done || step >= MAX_STEPS || !request.capture_screen {
+        // Stop if: the model said done, we hit the step cap, screen capture is
+        // off, or this step produced nothing new (model is just repeating).
+        if done || step >= MAX_STEPS || !request.capture_screen || !ran_new {
             break;
         }
 
@@ -287,11 +310,12 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
 
         let follow = AskRequest {
             question: format!(
-                "GOAL (from the user): {}\n\nSteps done so far:\n{}\n\nThis is the CURRENT screen after those steps. \
-                 If the goal is complete, reply with a short confirmation and [[DONE]]. \
-                 Otherwise continue with the next action tags. Do not repeat steps already done.",
+                "The user's ORIGINAL COMMAND was: \"{}\"\nDo exactly that — do not just describe the screen.\n\n\
+                 Steps already completed (do NOT repeat these):\n{}\n\nThis is the CURRENT screen after those steps. \
+                 If the command is now fully done, reply with a short confirmation and [[DONE]]. \
+                 Otherwise give ONLY the next new action tag(s).",
                 request.question,
-                if action_log.is_empty() { "(none yet)".into() } else { action_log.join("\n") }
+                action_log.join("\n")
             ),
             provider: request.provider.clone(),
             api_key: request.api_key.clone(),
