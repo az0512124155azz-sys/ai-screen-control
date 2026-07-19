@@ -564,29 +564,15 @@ fn do_scroll(up: bool) -> Result<(), String> {
     do_key(if up { "pgup" } else { "pgdn" })
 }
 
-#[cfg(target_os = "windows")]
-fn sendkeys_escape(text: &str) -> String {
-    let mut out = String::new();
-    for c in text.chars() {
-        match c {
-            '+' | '^' | '%' | '~' | '(' | ')' | '{' | '}' | '[' | ']' => {
-                out.push('{');
-                out.push(c);
-                out.push('}');
-            }
-            _ => out.push(c),
-        }
-    }
-    out
-}
-
 fn do_type(text: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        let escaped = sendkeys_escape(text).replace('\'', "''");
-        let ps = format!(
-            "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{escaped}')"
-        );
+        // Type character-by-character with a small delay so the user can SEE it
+        // typing (SendWait of the whole string would appear all at once). The
+        // text is passed as base64 to avoid any quoting/escaping problems.
+        let b64 = STANDARD.encode(text.as_bytes());
+        let script = r#"Add-Type -AssemblyName System.Windows.Forms; $t=[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('__B64__')); foreach($ch in $t.ToCharArray()){ $s=$ch.ToString(); if('+^%~(){}[]'.Contains($s)){$s='{'+$s+'}'}; [System.Windows.Forms.SendKeys]::SendWait($s); Start-Sleep -Milliseconds 55 }"#;
+        let ps = script.replace("__B64__", &b64);
         return Command::new("powershell")
             .args(["-NoProfile", "-Command", &ps])
             .status()
@@ -595,8 +581,11 @@ fn do_type(text: &str) -> Result<(), String> {
     }
     #[cfg(target_os = "macos")]
     {
+        // Type one character at a time with a small delay for a visible effect.
         let esc = text.replace('\\', "\\\\").replace('"', "\\\"");
-        let script = format!("tell application \"System Events\" to keystroke \"{esc}\"");
+        let script = format!(
+            "set t to \"{esc}\"\nrepeat with c in characters of t\ntell application \"System Events\" to keystroke (c as text)\ndelay 0.05\nend repeat"
+        );
         return Command::new("osascript")
             .args(["-e", &script])
             .status()
@@ -606,7 +595,7 @@ fn do_type(text: &str) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         return Command::new("xdotool")
-            .args(["type", "--delay", "30", text])
+            .args(["type", "--delay", "55", text])
             .status()
             .map_err(|e| e.to_string())
             .and_then(ok_status);
