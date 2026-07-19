@@ -684,37 +684,65 @@ async fn ask_gemini(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
         "contents": [{ "parts": parts }]
     });
 
-    // Authenticate with the x-goog-api-key header (works for both the legacy
-    // AIza... keys and the new AQ.... auth keys). The old ?key= query param is
-    // rejected for the new-format keys.
-    let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
-        req.model
-    );
-    let resp = reqwest::Client::new()
-        .post(&url)
-        .header("x-goog-api-key", &req.api_key)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    if let Some(err) = json.get("error") {
-        let msg = err["message"].as_str().unwrap_or("Gemini API error");
-        let lower = msg.to_lowercase();
-        if lower.contains("quota") || lower.contains("exhausted") || lower.contains("limit: 0") {
-            return Err("Your Google account has no Gemini quota (free-tier limit is 0). \
-                        Switch to Claude or OpenAI in Settings, or enable billing on your \
-                        Google Cloud project."
-                .to_string());
+    // Try the requested model, then fall back to models that stay available and
+    // keep free-tier quota. Older keys often have limit:0 on gemini-2.0-flash and
+    // 404 on the pinned 2.5-flash, while the "-latest" aliases still work.
+    let mut candidates = vec![req.model.clone()];
+    for m in ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.0-flash"] {
+        if !candidates.iter().any(|c| c == m) {
+            candidates.push(m.to_string());
         }
-        return Err(msg.to_string());
     }
-    Ok(json["candidates"][0]["content"]["parts"][0]["text"]
-        .as_str()
-        .unwrap_or("No response")
-        .to_string())
+
+    let client = reqwest::Client::new();
+    let mut last_err = String::from("Gemini API error");
+    for (idx, model) in candidates.iter().enumerate() {
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        );
+        // Authenticate with x-goog-api-key (works for both legacy AIza... keys
+        // and the new AQ.... auth keys; the old ?key= param rejects new keys).
+        let resp = client
+            .post(&url)
+            .header("x-goog-api-key", &req.api_key)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+        if let Some(err) = json.get("error") {
+            let msg = err["message"].as_str().unwrap_or("Gemini API error");
+            let lower = msg.to_lowercase();
+            let recoverable = lower.contains("quota")
+                || lower.contains("exhausted")
+                || lower.contains("limit: 0")
+                || lower.contains("not found")
+                || lower.contains("no longer available");
+            // If this model is quota-blocked or gone, try the next candidate.
+            if recoverable && idx + 1 < candidates.len() {
+                last_err = msg.to_string();
+                continue;
+            }
+            if lower.contains("api key not valid") || lower.contains("permission") {
+                return Err("Your Gemini API key isn't valid. Create a new one at \
+                            aistudio.google.com/app/apikey and paste it in Settings."
+                    .to_string());
+            }
+            if lower.contains("quota") || lower.contains("exhausted") || lower.contains("limit: 0") {
+                return Err("Your Google project has no Gemini quota left (free-tier limit is 0). \
+                            Create a fresh key at aistudio.google.com/app/apikey, or switch to \
+                            Claude / Local AI in Settings."
+                    .to_string());
+            }
+            return Err(msg.to_string());
+        }
+        return Ok(json["candidates"][0]["content"]["parts"][0]["text"]
+            .as_str()
+            .unwrap_or("No response")
+            .to_string());
+    }
+    Err(last_err)
 }
 
 // Open a URL in the user's default web browser.

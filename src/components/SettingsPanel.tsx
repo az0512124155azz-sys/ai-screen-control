@@ -27,7 +27,7 @@ const PROVIDERS: { id: Provider; label: string; icon: string; keyPage: string; m
   { id: 'ollama', label: 'Local AI · Free', icon: '💻', keyPage: 'https://ollama.com/download', model: 'gemma3' },
   { id: 'claude', label: 'Claude', icon: '🤖', keyPage: 'https://console.anthropic.com/settings/keys', model: 'claude-3-5-sonnet-20241022' },
   { id: 'openai', label: 'OpenAI (GPT-4o)', icon: '⚡', keyPage: 'https://platform.openai.com/api-keys', model: 'gpt-4o' },
-  { id: 'gemini', label: 'Gemini', icon: '🎨', keyPage: 'https://aistudio.google.com/app/apikey', model: 'gemini-2.0-flash' },
+  { id: 'gemini', label: 'Gemini', icon: '🎨', keyPage: 'https://aistudio.google.com/app/apikey', model: 'gemini-flash-latest' },
 ];
 
 export default function SettingsPanel({ config, onSave, onClose }: SettingsPanelProps) {
