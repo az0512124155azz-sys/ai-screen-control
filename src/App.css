@@ -60,6 +60,7 @@ html, body {
 .global-bubble:hover { transform: scale(1.06); }
 .global-bubble:active { cursor: grabbing; transform: scale(0.97); }
 .bubble-emoji { font-size: 24px; line-height: 1; }
+.logo-mark { display: block; }
 .bubble-badge {
   position: absolute;
   top: -3px;

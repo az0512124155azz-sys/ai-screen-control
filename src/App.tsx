@@ -52,6 +52,20 @@ async function setWindow(expanded: boolean) {
   }
 }
 
+// The AI Screen Control mark: a screen with an AI sparkle. White on the
+// bubble's gradient, so it reads clearly at small sizes.
+function LogoMark() {
+  return (
+    <svg className="logo-mark" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="none" stroke="#fff" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round">
+        <rect x="3" y="4.5" width="18" height="12.5" rx="2" />
+        <path d="M10.3 17 v1.6 M13.7 17 v1.6 M8.7 20.4 h6.6" />
+      </g>
+      <path d="M12 7 l1 3 3 1 -3 1 -1 3 -1 -3 -3 -1 3 -1 z" fill="#fff" />
+    </svg>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState<View>('bubble');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -145,7 +159,7 @@ export default function App() {
           aria-label="Open AI Screen Control"
           title="Tap to open · hold to move"
         >
-          <span className="bubble-emoji">🤖</span>
+          <LogoMark />
         </button>
       </div>
     );
