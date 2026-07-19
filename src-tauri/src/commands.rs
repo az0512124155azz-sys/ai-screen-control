@@ -325,6 +325,7 @@ pub async fn ask(window: tauri::WebviewWindow, request: AskRequest) -> Result<AI
     // same site over and over. Other actions (scroll, click, type, key) are
     // allowed to repeat — they legitimately recur in a real task.
     let mut opened_urls: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut nav_count: usize = 0;
     let mut last_response = first.clone();
     let mut verified_done = false;
     let mut step = 0;
@@ -332,20 +333,29 @@ pub async fn ask(window: tauri::WebviewWindow, request: AskRequest) -> Result<AI
     // verified [[DONE]], an empty step, or the model getting stuck.
     const MAX_STEPS: usize = 20;
 
+    // Hard limit on how many browser tabs the whole run may open. A real task
+    // almost never needs more than a couple; this guarantees no tab-spam no
+    // matter how many search variants the model tries.
+    const MAX_NAVIGATIONS: usize = 3;
+
     loop {
         // Run this step's actions.
         let mut ran_any = false;
-        // Anything that opens a browser tab (OPEN_URL / SEARCH) is de-duplicated
-        // across the whole run so the model can't spam dozens of identical tabs.
+        // Allow at most ONE navigation (tab-opening) per step, and cap the total
+        // across the run — the model kept opening the same search many ways.
+        let mut nav_this_step = false;
         for (cmd, arg) in actions.iter().take(12) {
             if cmd == "DONE" {
                 continue;
             }
             if cmd == "OPEN_URL" || cmd == "SEARCH" {
                 let key = format!("{cmd}|{}", arg.trim().to_lowercase());
-                if !opened_urls.insert(key) {
-                    continue; // same URL / same search already done — skip
+                let duplicate = !opened_urls.insert(key);
+                if duplicate || nav_this_step || nav_count >= MAX_NAVIGATIONS {
+                    continue; // skip duplicate / extra tab-opening
                 }
+                nav_this_step = true;
+                nav_count += 1;
             }
             ran_any = true;
             match execute_action(cmd, arg).await {
