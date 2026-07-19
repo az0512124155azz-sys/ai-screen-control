@@ -189,6 +189,13 @@ pub async fn screenshot() -> Result<ScreenshotResult, String> {
 
 // ---------- AI (multi-provider) ----------
 
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMsg {
+    pub role: String, // "user" | "assistant"
+    pub content: String,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AskRequest {
@@ -198,6 +205,25 @@ pub struct AskRequest {
     pub model: String,
     #[serde(default)]
     pub capture_screen: bool,
+    // Recent conversation so the model understands follow-ups like
+    // "search there" — i.e. remembers Amazon was just opened.
+    #[serde(default)]
+    pub history: Vec<ChatMsg>,
+}
+
+// Render recent turns as a short context preamble prepended to the command.
+fn history_preamble(history: &[ChatMsg]) -> String {
+    if history.is_empty() {
+        return String::new();
+    }
+    let mut s = String::from("Recent conversation (for context — the user's new command may refer to it):\n");
+    for m in history.iter().rev().take(6).rev() {
+        let who = if m.role == "assistant" { "Assistant" } else { "User" };
+        let line: String = m.content.chars().take(300).collect();
+        s.push_str(&format!("{who}: {line}\n"));
+    }
+    s.push('\n');
+    s
 }
 
 #[derive(Serialize)]
@@ -253,13 +279,15 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
     // screen — small local models otherwise tend to just narrate what they see.
     let first_req = AskRequest {
         question: format!(
-            "The user's command: \"{}\"\nCarry it out using action tags. If it is a web/search task, open the right URL directly with OPEN_URL. Do the task — don't just describe what's on screen.",
+            "{}The user's new command: \"{}\"\nCarry it out using action tags. Use the conversation context above: if the command refers to a site already open (e.g. \"search there\"), act inside THAT site — for a search, type into that site's own search box (CLICK it, TYPE the query, [[KEY|enter]]) or open its search URL, not Google. Do the task — don't just describe what's on screen.",
+            history_preamble(&request.history),
             request.question
         ),
         provider: request.provider.clone(),
         api_key: request.api_key.clone(),
         model: request.model.clone(),
         capture_screen: request.capture_screen,
+        history: Vec::new(),
     };
     let first = ask_provider(&first_req, image_b64.as_deref()).await?;
     let (clean_text, mut actions) = extract_actions(&first);
@@ -321,6 +349,7 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
             api_key: request.api_key.clone(),
             model: request.model.clone(),
             capture_screen: request.capture_screen,
+            history: Vec::new(),
         };
 
         let next = match ask_provider(&follow, shot.as_deref()).await {

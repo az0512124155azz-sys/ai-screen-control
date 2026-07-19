@@ -117,12 +117,15 @@ export default function App() {
     // Ollama runs locally and needs no key; the others require one.
     if (config.provider !== 'ollama' && !apiKey) { setView('settings'); return; }
 
+    // Send recent turns so the AI understands follow-ups ("search there").
+    const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+
     addMessage('user', question);
     setInput('');
     setLoading(true);
     try {
       const result: any = await invoke('ask', {
-        request: { question, provider: config.provider, apiKey, model: modelFor(config.provider), captureScreen: useScreen },
+        request: { question, provider: config.provider, apiKey, model: modelFor(config.provider), captureScreen: useScreen, history },
       });
       addMessage('assistant', result?.response ?? 'No response');
     } catch (err) {
