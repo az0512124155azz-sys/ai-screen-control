@@ -246,6 +246,7 @@ Available actions:\n\
 - TYPE: types text at the current cursor position.\n\
 - KEY: presses a key or combo: enter, tab, esc, backspace, delete, up, down, left, right, home, end, or combos like ctrl+l, ctrl+c, alt+tab.\n\
 - CLICK: clicks at screen pixel coordinates x,y. The screenshot has a PINK COORDINATE GRID drawn on it: numbers along the TOP are x (horizontal) pixels, numbers down the LEFT are y (vertical) pixels. READ the target's position off this grid — find the nearest labelled lines and interpolate between them — then give those exact numbers. Do NOT guess without using the grid.\n\
+- SCROLL: scrolls the page. Use [[SCROLL|down]] or [[SCROLL|up]] (repeat to go further). Essential for long pages — scroll to bring things into view before clicking.\n\
 - WAIT: pauses N milliseconds between steps (use after OPEN_URL so pages can load).\n\
 - [[DONE]]: add this tag (alone) once the user's goal is fully achieved.\n\
 Rules:\n\
@@ -301,24 +302,27 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
     // Only loops when we can see the screen (screen capture on) and there is
     // more to do; bounded so it always terminates.
     let mut action_log: Vec<String> = Vec::new();
-    // Remember every action already performed so a repetitive model can't make
-    // us do the same thing (e.g. re-open the same URL) over and over.
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Remember which URLs we've opened so a repetitive model can't reopen the
+    // same site over and over. Other actions (scroll, click, type, key) are
+    // allowed to repeat — they legitimately recur in a real task.
+    let mut opened_urls: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut last_response = first.clone();
     let mut step = 0;
-    const MAX_STEPS: usize = 4;
+    // Allow long, genuinely multi-step tasks — the loop still stops early on
+    // [[DONE]], an empty step, or the model getting stuck repeating itself.
+    const MAX_STEPS: usize = 10;
 
     loop {
-        // Run this step's actions, skipping any we've already performed.
-        let mut ran_new = false;
+        // Run this step's actions.
+        let mut ran_any = false;
         for (cmd, arg) in actions.iter().take(12) {
             if cmd == "DONE" {
                 continue;
             }
-            let key = format!("{cmd}|{arg}");
-            if !seen.insert(key) {
-                continue; // already did exactly this — don't repeat it
+            if cmd == "OPEN_URL" && !opened_urls.insert(arg.clone()) {
+                continue; // this exact site is already open — don't reopen it
             }
-            ran_new = true;
+            ran_any = true;
             match execute_action(cmd, arg).await {
                 Ok(note) => action_log.push(format!("✅ {note}")),
                 Err(e) => action_log.push(format!("⚠️ {cmd} failed: {e}")),
@@ -327,8 +331,8 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
 
         step += 1;
         // Stop if: the model said done, we hit the step cap, screen capture is
-        // off, or this step produced nothing new (model is just repeating).
-        if done || step >= MAX_STEPS || !request.capture_screen || !ran_new {
+        // off, or this step did nothing (only duplicate URLs / no actions).
+        if done || step >= MAX_STEPS || !request.capture_screen || !ran_any {
             break;
         }
 
@@ -356,6 +360,11 @@ pub async fn ask(request: AskRequest) -> Result<AIResponse, String> {
             Ok(t) => t,
             Err(_) => break, // network/model hiccup — stop cleanly with what we have
         };
+        // If the model just repeats its previous reply, it's stuck — stop.
+        if next.trim() == last_response.trim() {
+            break;
+        }
+        last_response = next.clone();
         let (next_text, next_actions) = extract_actions(&next);
         if !next_text.trim().is_empty() {
             transcript.push_str("\n");
@@ -463,8 +472,19 @@ async fn execute_action(cmd: &str, arg: &str) -> Result<String, String> {
             do_click(x, y)?;
             Ok(format!("Clicked at {x},{y}"))
         }
+        "SCROLL" => {
+            let up = arg.to_lowercase().contains("up");
+            do_scroll(up)?;
+            Ok(format!("Scrolled {}", if up { "up" } else { "down" }))
+        }
         other => Err(format!("unknown action '{other}'")),
     }
+}
+
+// Scroll the page/window under the cursor. Page Up/Down is the most portable
+// way to scroll the focused browser or app across all three platforms.
+fn do_scroll(up: bool) -> Result<(), String> {
+    do_key(if up { "pgup" } else { "pgdn" })
 }
 
 #[cfg(target_os = "windows")]
@@ -583,6 +603,8 @@ fn do_key(combo: &str) -> Result<(), String> {
             "down" => "key code 125".to_string(),
             "left" => "key code 123".to_string(),
             "right" => "key code 124".to_string(),
+            "pgdn" | "pagedown" => "key code 121".to_string(),
+            "pgup" | "pageup" => "key code 116".to_string(),
             "space" => "keystroke \" \"".to_string(),
             k if k.len() == 1 => format!("keystroke \"{k}\""),
             k => return Err(format!("unsupported key '{k}'")),
@@ -614,6 +636,8 @@ fn do_key(combo: &str) -> Result<(), String> {
                 "down" => "Down".to_string(),
                 "left" => "Left".to_string(),
                 "right" => "Right".to_string(),
+                "pgdn" | "pagedown" => "Next".to_string(),
+                "pgup" | "pageup" => "Prior".to_string(),
                 "space" => "space".to_string(),
                 other => other.to_string(),
             })
