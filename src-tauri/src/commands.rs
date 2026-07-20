@@ -67,8 +67,13 @@ fn capture_screen_png() -> Result<Vec<u8>, String> {
 
     #[cfg(target_os = "windows")]
     {
+        // SetProcessDPIAware is CRITICAL: without it, on displays scaled to
+        // 125%/150% Windows lies to the process about pixel coordinates, so the
+        // screenshot geometry and the click coordinates live in DIFFERENT
+        // coordinate spaces and every click lands in the wrong place.
         let ps = format!(
-            "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \
+            "Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetProcessDPIAware();' -Name DPI -Namespace W2; [void][W2.DPI]::SetProcessDPIAware(); \
+             Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \
              $b = [System.Windows.Forms.SystemInformation]::VirtualScreen; \
              $bmp = New-Object System.Drawing.Bitmap($b.Width, $b.Height); \
              $g = [System.Drawing.Graphics]::FromImage($bmp); \
@@ -835,7 +840,8 @@ fn do_click(x: i32, y: i32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         let ps = format!(
-            "Add-Type -AssemblyName System.Windows.Forms; \
+            "Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetProcessDPIAware();' -Name DPI -Namespace W2; [void][W2.DPI]::SetProcessDPIAware(); \
+             Add-Type -AssemblyName System.Windows.Forms; \
              Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern void mouse_event(int f, int dx, int dy, int d, int e);' -Name U32 -Namespace W; \
              [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point({x}, {y}); \
              Start-Sleep -Milliseconds 60; \
@@ -883,7 +889,8 @@ fn do_drag(x1: i32, y1: i32, x2: i32, y2: i32) -> Result<(), String> {
             ));
         }
         let ps = format!(
-            "Add-Type -AssemblyName System.Windows.Forms; \
+            "Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetProcessDPIAware();' -Name DPI -Namespace W2; [void][W2.DPI]::SetProcessDPIAware(); \
+             Add-Type -AssemblyName System.Windows.Forms; \
              Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern void mouse_event(int f, int dx, int dy, int d, int e);' -Name U32 -Namespace W; \
              [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point({x1}, {y1}); \
              Start-Sleep -Milliseconds 80; [W.U32]::mouse_event(2, 0, 0, 0, 0); Start-Sleep -Milliseconds 80; \
