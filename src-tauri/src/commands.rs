@@ -7,6 +7,94 @@ use std::process::Command;
 // Bold TTF bundled at build time, used to label the coordinate grid.
 const GRID_FONT: &[u8] = include_bytes!("../assets/grid-font.ttf");
 
+// Native input engine for Windows (SendInput via enigo). Replaces the old
+// PowerShell helpers, which spawned a fresh process (and compiled C#) for
+// EVERY click/keystroke — 1-2 seconds of lag per action and fragile besides.
+// Native calls are instant and operate in real physical pixels (the Tauri
+// process is DPI-aware), exactly matching the coordinate grid.
+#[cfg(target_os = "windows")]
+mod win_input {
+    use enigo::{Button, Coordinate, Direction, Enigo, Key, Keyboard, Mouse, Settings};
+
+    fn engine() -> Result<Enigo, String> {
+        Enigo::new(&Settings::default()).map_err(|e| format!("input init failed: {e:?}"))
+    }
+
+    pub fn click(x: i32, y: i32) -> Result<(), String> {
+        let mut en = engine()?;
+        en.move_mouse(x, y, Coordinate::Abs).map_err(|e| format!("{e:?}"))?;
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        en.button(Button::Left, Direction::Click).map_err(|e| format!("{e:?}"))
+    }
+
+    pub fn drag(x1: i32, y1: i32, x2: i32, y2: i32) -> Result<(), String> {
+        let mut en = engine()?;
+        en.move_mouse(x1, y1, Coordinate::Abs).map_err(|e| format!("{e:?}"))?;
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        en.button(Button::Left, Direction::Press).map_err(|e| format!("{e:?}"))?;
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        for i in 1..=10 {
+            let mx = x1 + (x2 - x1) * i / 10;
+            let my = y1 + (y2 - y1) * i / 10;
+            en.move_mouse(mx, my, Coordinate::Abs).map_err(|e| format!("{e:?}"))?;
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        en.button(Button::Left, Direction::Release).map_err(|e| format!("{e:?}"))
+    }
+
+    // Character-by-character so the user can watch it type; handles any
+    // language (Hebrew included) via unicode SendInput.
+    pub fn type_text(text: &str) -> Result<(), String> {
+        let mut en = engine()?;
+        for ch in text.chars() {
+            en.text(&ch.to_string()).map_err(|e| format!("{e:?}"))?;
+            std::thread::sleep(std::time::Duration::from_millis(35));
+        }
+        Ok(())
+    }
+
+    pub fn key_combo(combo: &str) -> Result<(), String> {
+        let mut en = engine()?;
+        let mut mods: Vec<Key> = Vec::new();
+        let mut base = combo;
+        for part in combo.split('+') {
+            match part {
+                "ctrl" | "control" => mods.push(Key::Control),
+                "alt" => mods.push(Key::Alt),
+                "shift" => mods.push(Key::Shift),
+                other => base = other,
+            }
+        }
+        let key = match base {
+            "enter" | "return" => Key::Return,
+            "tab" => Key::Tab,
+            "esc" | "escape" => Key::Escape,
+            "backspace" => Key::Backspace,
+            "delete" | "del" => Key::Delete,
+            "up" => Key::UpArrow,
+            "down" => Key::DownArrow,
+            "left" => Key::LeftArrow,
+            "right" => Key::RightArrow,
+            "home" => Key::Home,
+            "end" => Key::End,
+            "pgup" | "pageup" => Key::PageUp,
+            "pgdn" | "pagedown" => Key::PageDown,
+            "space" => Key::Space,
+            k if k.chars().count() == 1 => Key::Unicode(k.chars().next().unwrap()),
+            k => return Err(format!("unsupported key '{k}'")),
+        };
+        for m in &mods {
+            en.key(*m, Direction::Press).map_err(|e| format!("{e:?}"))?;
+        }
+        en.key(key, Direction::Click).map_err(|e| format!("{e:?}"))?;
+        for m in mods.iter().rev() {
+            en.key(*m, Direction::Release).map_err(|e| format!("{e:?}"))?;
+        }
+        Ok(())
+    }
+}
+
 // Build a Command that never flashes a console window on Windows. Without the
 // CREATE_NO_WINDOW flag, every PowerShell/cmd helper pops a black terminal on
 // screen — which the AI then sees in its screenshot and tries to "close".
@@ -115,8 +203,9 @@ fn encode_screen(grid: bool) -> Result<Vec<u8>, String> {
     // Real screen size — grid labels use these values.
     let (real_w, real_h) = (img.width(), img.height());
 
-    // Higher res so the model can read small text and hit small targets.
-    const MAX: u32 = 1600;
+    // Full HD passes through unscaled: the grid then aligns 1:1 with real
+    // pixels and the model reads text/coordinates without interpolation blur.
+    const MAX: u32 = 1920;
     let longest = real_w.max(real_h);
     let scaled = if longest > MAX {
         let ratio = MAX as f32 / longest as f32;
@@ -685,17 +774,7 @@ fn do_scroll(up: bool) -> Result<(), String> {
 fn do_type(text: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        // Type character-by-character with a small delay so the user can SEE it
-        // typing (SendWait of the whole string would appear all at once). The
-        // text is passed as base64 to avoid any quoting/escaping problems.
-        let b64 = STANDARD.encode(text.as_bytes());
-        let script = r#"Add-Type -AssemblyName System.Windows.Forms; $t=[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('__B64__')); foreach($ch in $t.ToCharArray()){ $s=$ch.ToString(); if('+^%~(){}[]'.Contains($s)){$s='{'+$s+'}'}; [System.Windows.Forms.SendKeys]::SendWait($s); Start-Sleep -Milliseconds 55 }"#;
-        let ps = script.replace("__B64__", &b64);
-        return new_command("powershell")
-            .args(["-NoProfile", "-Command", &ps])
-            .status()
-            .map_err(|e| e.to_string())
-            .and_then(ok_status);
+        return win_input::type_text(text);
     }
     #[cfg(target_os = "macos")]
     {
@@ -726,44 +805,7 @@ fn do_key(combo: &str) -> Result<(), String> {
     let combo = combo.trim().to_lowercase();
     #[cfg(target_os = "windows")]
     {
-        // SendKeys syntax: ^=ctrl %=alt +=shift, special keys in {braces}.
-        let mut mods = String::new();
-        let mut base = combo.as_str();
-        for part in combo.split('+') {
-            match part {
-                "ctrl" | "control" => mods.push('^'),
-                "alt" => mods.push('%'),
-                "shift" => mods.push('+'),
-                other => base = other,
-            }
-        }
-        let key = match base {
-            "enter" | "return" => "{ENTER}".to_string(),
-            "tab" => "{TAB}".to_string(),
-            "esc" | "escape" => "{ESC}".to_string(),
-            "backspace" => "{BACKSPACE}".to_string(),
-            "delete" | "del" => "{DELETE}".to_string(),
-            "up" => "{UP}".to_string(),
-            "down" => "{DOWN}".to_string(),
-            "left" => "{LEFT}".to_string(),
-            "right" => "{RIGHT}".to_string(),
-            "home" => "{HOME}".to_string(),
-            "end" => "{END}".to_string(),
-            "pgup" | "pageup" => "{PGUP}".to_string(),
-            "pgdn" | "pagedown" => "{PGDN}".to_string(),
-            "space" => " ".to_string(),
-            k if k.len() == 1 => k.to_string(),
-            k if k.starts_with('f') && k[1..].parse::<u8>().is_ok() => format!("{{{}}}", k.to_uppercase()),
-            k => return Err(format!("unsupported key '{k}'")),
-        };
-        let ps = format!(
-            "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{mods}{key}')"
-        );
-        return new_command("powershell")
-            .args(["-NoProfile", "-Command", &ps])
-            .status()
-            .map_err(|e| e.to_string())
-            .and_then(ok_status);
+        return win_input::key_combo(&combo);
     }
     #[cfg(target_os = "macos")]
     {
@@ -839,19 +881,7 @@ fn do_key(combo: &str) -> Result<(), String> {
 fn do_click(x: i32, y: i32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        let ps = format!(
-            "Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetProcessDPIAware();' -Name DPI -Namespace W2; [void][W2.DPI]::SetProcessDPIAware(); \
-             Add-Type -AssemblyName System.Windows.Forms; \
-             Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern void mouse_event(int f, int dx, int dy, int d, int e);' -Name U32 -Namespace W; \
-             [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point({x}, {y}); \
-             Start-Sleep -Milliseconds 60; \
-             [W.U32]::mouse_event(2, 0, 0, 0, 0); [W.U32]::mouse_event(4, 0, 0, 0, 0)"
-        );
-        return new_command("powershell")
-            .args(["-NoProfile", "-Command", &ps])
-            .status()
-            .map_err(|e| e.to_string())
-            .and_then(ok_status);
+        return win_input::click(x, y);
     }
     #[cfg(target_os = "macos")]
     {
@@ -878,29 +908,7 @@ fn do_click(x: i32, y: i32) -> Result<(), String> {
 fn do_drag(x1: i32, y1: i32, x2: i32, y2: i32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        // Move to start, press, glide through a few interpolated points (some
-        // drag targets require intermediate move events), then release.
-        let mut moves = String::new();
-        for i in 1..=8 {
-            let mx = x1 + (x2 - x1) * i / 8;
-            let my = y1 + (y2 - y1) * i / 8;
-            moves.push_str(&format!(
-                "[System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point({mx}, {my}); Start-Sleep -Milliseconds 25; "
-            ));
-        }
-        let ps = format!(
-            "Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetProcessDPIAware();' -Name DPI -Namespace W2; [void][W2.DPI]::SetProcessDPIAware(); \
-             Add-Type -AssemblyName System.Windows.Forms; \
-             Add-Type -MemberDefinition '[DllImport(\"user32.dll\")] public static extern void mouse_event(int f, int dx, int dy, int d, int e);' -Name U32 -Namespace W; \
-             [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point({x1}, {y1}); \
-             Start-Sleep -Milliseconds 80; [W.U32]::mouse_event(2, 0, 0, 0, 0); Start-Sleep -Milliseconds 80; \
-             {moves} Start-Sleep -Milliseconds 80; [W.U32]::mouse_event(4, 0, 0, 0, 0)"
-        );
-        return new_command("powershell")
-            .args(["-NoProfile", "-Command", &ps])
-            .status()
-            .map_err(|e| e.to_string())
-            .and_then(ok_status);
+        return win_input::drag(x1, y1, x2, y2);
     }
     #[cfg(target_os = "linux")]
     {
