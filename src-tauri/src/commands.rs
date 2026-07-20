@@ -299,7 +299,7 @@ pub async fn ask(window: tauri::WebviewWindow, request: AskRequest) -> Result<AI
     // screen — small local models otherwise tend to just narrate what they see.
     let first_req = AskRequest {
         question: format!(
-            "{}The user's new command: \"{}\"\nCarry it out using action tags. Use the conversation context above: if the command refers to a site already open (e.g. \"search there\"), search INSIDE that site with [[SEARCH|site|query]] using that site's name — never invent a search URL. Do the task — don't just describe what's on screen.",
+            "{}The user's new command: \"{}\"\nFirst write a SHORT numbered plan (2-5 steps) of how you'll complete the WHOLE command, then start executing it with action tags in the same reply. Use the conversation context above: if the command refers to a site already open (e.g. \"search there\"), search INSIDE that site with [[SEARCH|site|query]] using that site's name — never invent a search URL. Do the task — don't just describe what's on screen.",
             history_preamble(&request.history),
             request.question
         ),
@@ -388,11 +388,13 @@ pub async fn ask(window: tauri::WebviewWindow, request: AskRequest) -> Result<AI
             )
         } else {
             format!(
-                "The user's command was: \"{}\"\nDo exactly that — don't just describe the screen. This is a \
+                "The user's command was: \"{}\"\nYOUR PLAN (stick to it, continue from where you are):\n{}\n\n\
+                 Do exactly the command — don't just describe the screen. This is a \
                  multi-item task if it has several parts: complete ALL of them, one after another.\n\n\
                  Steps already completed (do NOT repeat these):\n{}\n\nThis is the CURRENT screen. \
                  If EVERYTHING is now done, reply briefly and [[DONE]]. Otherwise give ONLY the next new action tag(s).",
                 request.question,
+                clean_text.trim(),
                 action_log.join("\n")
             )
         };
@@ -1129,7 +1131,12 @@ async fn ask_gemini(req: &AskRequest, image_b64: Option<&str>) -> Result<String,
     // keep free-tier quota. Older keys often have limit:0 on gemini-2.0-flash and
     // 404 on the pinned 2.5-flash, while the "-latest" aliases still work.
     let mut candidates = vec![req.model.clone()];
-    for m in ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.0-flash"] {
+    for m in [
+        "gemini-3-flash-preview",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-2.0-flash",
+    ] {
         if !candidates.iter().any(|c| c == m) {
             candidates.push(m.to_string());
         }
